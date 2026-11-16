@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src https://api.github.com; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#101217" media="(prefers-color-scheme: dark)">
+  <title>Fila do Claude</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icone-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="icone-192.png">
+  <link rel="stylesheet" href="estilo.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="topo">
+    <h1>Fila do Claude</h1>
+    <button type="button" id="abrir-config" class="botao-icone" aria-label="Configurações" aria-controls="config" aria-expanded="false">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.4 7.4 0 0 0-1.7-1l-.4-2.6h-3.8l-.4 2.6a7.4 7.4 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.6 7.6 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7.4 7.4 0 0 0 1.7 1l.4 2.6h3.8l.4-2.6a7.4 7.4 0 0 0 1.7-1l2.4 1 2-3.4-2-1.6zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"/></svg>
+    </button>
+  </header>
+
+  <main>
+    <p id="aviso" class="aviso" role="status" aria-live="polite" hidden></p>
+
+    <section id="config" class="cartao" hidden aria-labelledby="titulo-config">
+      <h2 id="titulo-config">Configuração</h2>
+      <p class="suave">Os links vão como issues para um repositório <strong>privado</strong> seu no GitHub. O token fica só
+        neste celular.</p>
+      <form id="form-config" novalidate>
+        <label for="repo">Repositório da fila</label>
+        <input id="repo" name="repo" type="text" inputmode="url" autocomplete="off" autocapitalize="off"
+               spellcheck="false" placeholder="usuario/fila-videos" required>
+        <label for="token">Token do GitHub</label>
+        <input id="token" name="token" type="password" autocomplete="off" autocapitalize="off" spellcheck="false"
+               placeholder="github_pat_..." required>
+        <p class="suave pequeno">Token fino (fine-grained), só com este repositório e a permissão
+          <em>Issues: Read and write</em>.</p>
+        <div class="linha-botoes">
+          <button type="submit" class="botao">Salvar e testar</button>
+          <button type="button" id="apagar-config" class="botao botao-secundario">Apagar deste celular</button>
+        </div>
+      </form>
+    </section>
+
+    <section id="compartilhado" class="cartao destaque" hidden aria-labelledby="titulo-compartilhado">
+      <h2 id="titulo-compartilhado">Vídeo recebido</h2>
+      <p id="link-compartilhado" class="link-quebra"></p>
+      <p id="estado-compartilhado" class="estado"></p>
+      <form id="form-nota" hidden novalidate>
+        <label for="nota">Nota para o Claude (opcional)</label>
+        <textarea id="nota" name="nota" rows="2" maxlength="500" placeholder="ex.: ver se serve pro Ultron"></textarea>
+        <button type="submit" class="botao">Salvar nota</button>
+      </form>
+    </section>
+
+    <section class="cartao" aria-labelledby="titulo-colar">
+      <h2 id="titulo-colar">Colar um link</h2>
+      <form id="form-colar" class="linha-campo" novalidate>
+        <label for="link-colado" class="so-leitor">Link do vídeo</label>
+        <input id="link-colado" name="link" type="url" inputmode="url" autocomplete="off" placeholder="https://www.instagram.com/reel/...">
+        <button type="submit" class="botao">Mandar</button>
+      </form>
+    </section>
+
+    <section id="secao-pendentes" class="cartao" hidden aria-labelledby="titulo-pendentes">
+      <h2 id="titulo-pendentes">Ainda não enviados</h2>
+      <p class="suave pequeno">Ficaram neste celular porque a internet ou o GitHub falhou.</p>
+      <ul id="lista-pendentes" class="lista-simples"></ul>
+      <button type="button" id="reenviar" class="botao">Tentar de novo</button>
+    </section>
+
+    <section class="cartao" aria-labelledby="titulo-fila">
+      <div class="cabecalho-secao">
+        <h2 id="titulo-fila">Fila</h2>
+        <button type="button" id="atualizar" class="botao-texto">Atualizar</button>
+      </div>
+      <ul id="fila" class="fila"></ul>
+      <p id="fila-vazia" class="suave" hidden>Nada na fila ainda. No Instagram, toque em Compartilhar e escolha
+        <strong>Fila do Claude</strong>.</p>
+    </section>
+  </main>
+</body>
+</html>
