@@ -8,13 +8,21 @@ transcreve os vídeos, e o Claude responde na própria issue com **Vale a pena**
 
 ## O que o app faz
 
-- **Compartilhar → Garimpo** manda o vídeo para a fila, com uma nota opcional ("ver se serve pro Ultron").
+- **Compartilhar → Garimpo** manda o vídeo para a fila, com uma nota opcional ("ver se serve pro Ultron"). Também
+  dá para colar um link, ou vários de uma vez.
 - Se o vídeo **já foi analisado**, mostra o veredito na hora, sem criar outro pedido. Se já está na fila, avisa.
-- A lista mostra o nome da ferramenta, a situação (Na fila, Esperando análise, Vale a pena, Evite, Falhou) e o texto
-  da análise direto no cartão.
+- A lista é agrupada por dia (Hoje, Ontem, Esta semana...). Cada cartão mostra:
+  - o nome da ferramenta e a situação;
+  - o andamento (Recebido → Baixado → Analisado);
+  - a análise, com a **fonte** oficial, os **projetos** para quem serve e o **comando de instalação** com botão
+    Copiar.
+- Vereditos que chegaram desde a última visita ganham **Novo**, um filtro próprio e a contagem no título.
 - **Filtros** com contagem e **busca** por ferramenta, nota ou análise.
-- **Tentar de novo** num vídeo que falhou e **Remover** um vídeo da fila (com um segundo toque para confirmar).
+- **Compartilhar** um veredito, **Tentar de novo** num vídeo que falhou e **Remover** um vídeo da fila (com um
+  segundo toque para confirmar).
 - Abre na hora com a última lista, inclusive sem internet, e atualiza sozinho quando você volta para o app.
+- A configuração tem o botão **Criar token no GitHub**, que abre a página já preenchida. O app também oferece
+  **Instalar** quando o Chrome deixa.
 
 ## Contrato com o PC
 
@@ -23,7 +31,7 @@ transcreve os vídeos, e o Claude responde na própria issue com **Vale a pena**
 | Título | `<rótulo> · <link>` ou só `<link>`. O rótulo é o @autor depois do download e o nome da ferramenta depois da análise. |
 | Corpo | A nota. |
 | Etiquetas | `baixado`, `falhou`, `analisado` + `vale-a-pena` ou `evite`. São a fonte da verdade da situação. |
-| Comentário | O último que começa com `**Vale a pena**` ou `**Evite**` é o texto da análise. |
+| Comentário | O último que começa com `**Vale a pena**` ou `**Evite**` é a análise: o motivo num parágrafo e, depois de uma linha em branco, as linhas opcionais `Fonte: https://...`, `Para: Ultron, Remedicy` e ``Instalar: `comando` ``. |
 
 ## Como funciona
 
@@ -34,6 +42,8 @@ transcreve os vídeos, e o Claude responde na própria issue com **Vale a pena**
   compartilhou).
 - Sem internet, o link fica guardado no celular e vai sozinho quando a conexão voltar.
 - O app recusa um repositório público, para os links e as notas não ficarem visíveis.
+- O texto das análises vem de comentários do GitHub. A tela só o mostra como texto, e a fonte só vira link se
+  for `https`.
 
 ## Instalar
 
@@ -41,7 +51,10 @@ transcreve os vídeos, e o Claude responde na própria issue com **Vale a pena**
 2. Menu ⋮ → **Instalar app** (ou "Adicionar à tela inicial" → Instalar).
    - Xiaomi (MIUI/HyperOS): se não aparecer o ícone, libere em Configurações → Apps → Chrome → Outras permissões
      → **Atalhos na tela inicial**.
-3. Abra o app, toque na engrenagem e preencha o repositório (`usuario/garimpo-fila`) e o token.
+3. Abra o app e siga os dois passos da configuração:
+   - **Criar token no GitHub**. A página abre com o nome e a validade de 1 ano (o link também pede a permissão de
+     Issues). Escolha *Only select repositories* → a fila e confira *Issues: Read and write* em *Permissions*.
+   - Preencha o repositório (`usuario/garimpo-fila`) e cole o token.
 4. No Instagram: Compartilhar → **Garimpo**. Ele só aparece na lista se foi *instalado* (passo 2), não
    apenas adicionado como favorito.
 

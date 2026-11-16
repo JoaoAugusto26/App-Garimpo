@@ -13,44 +13,72 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icone-192.png" type="image/png">
   <link rel="apple-touch-icon" href="icone-192.png">
-  <link rel="stylesheet" href="estilo.css?v=3">
-  <script src="app.js?v=3" defer></script>
+  <link rel="stylesheet" href="estilo.css?v=4">
+  <script src="app.js?v=4" defer></script>
 </head>
 <body>
   <header class="topo">
     <div class="marca">
-      <img src="icone-192.png" width="28" height="28" alt="">
+      <img src="icone-192.png" width="30" height="30" alt="">
       <h1>Garimpo</h1>
     </div>
-    <button type="button" id="abrir-config" class="botao-icone" aria-label="Configurações" aria-controls="config" aria-expanded="false">
-      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.4 7.4 0 0 0-1.7-1l-.4-2.6h-3.8l-.4 2.6a7.4 7.4 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.6 7.6 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7.4 7.4 0 0 0 1.7 1l.4 2.6h3.8l.4-2.6a7.4 7.4 0 0 0 1.7-1l2.4 1 2-3.4-2-1.6zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"/></svg>
-    </button>
+    <div class="topo-acoes">
+      <span id="offline" class="pilula-offline" hidden>Sem internet</span>
+      <button type="button" id="abrir-config" class="botao-icone" aria-label="Configurações" aria-controls="config" aria-expanded="false">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.4 7.4 0 0 0-1.7-1l-.4-2.6h-3.8l-.4 2.6a7.4 7.4 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.6 7.6 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7.4 7.4 0 0 0 1.7 1l.4 2.6h3.8l.4-2.6a7.4 7.4 0 0 0 1.7-1l2.4 1 2-3.4-2-1.6zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"/></svg>
+      </button>
+    </div>
   </header>
 
   <main>
     <p id="aviso" class="aviso" role="alert" hidden></p>
 
+    <section id="instalar-app" class="cartao faixa" hidden aria-labelledby="titulo-instalar">
+      <img src="icone-192.png" width="40" height="40" alt="">
+      <div class="faixa-texto">
+        <h2 id="titulo-instalar" class="faixa-titulo">Instale o Garimpo</h2>
+        <p class="suave pequeno">Assim ele aparece no Compartilhar do Instagram.</p>
+      </div>
+      <button type="button" id="instalar" class="botao">Instalar</button>
+    </section>
+
     <section id="config" class="cartao" hidden aria-labelledby="titulo-config">
-      <h2 id="titulo-config">Configuração</h2>
-      <p id="conectado" class="conectado" hidden></p>
-      <p class="suave">Os vídeos vão como issues para um repositório <strong>privado</strong> seu no GitHub. O token fica só
+      <div class="cartao-topo">
+        <h2 id="titulo-config">Configuração</h2>
+        <p id="conectado" class="conectado" hidden></p>
+      </div>
+      <p class="suave">Cada vídeo vira uma issue num repositório <strong>privado</strong> seu no GitHub. O token fica só
         neste celular.</p>
       <form id="form-config" novalidate>
-        <label for="repo">Repositório da fila</label>
-        <input id="repo" name="repo" type="text" inputmode="url" autocomplete="off" autocapitalize="off"
-               spellcheck="false" placeholder="usuario/garimpo-fila" required>
-        <label for="token">Token do GitHub</label>
-        <div class="linha-campo">
-          <input id="token" name="token" type="password" autocomplete="off" autocapitalize="off" spellcheck="false"
-                 placeholder="github_pat_..." required>
-          <button type="button" id="colar-token" class="botao botao-secundario">Colar</button>
-        </div>
-        <p class="suave pequeno">Token fino (fine-grained), só com este repositório e a permissão
-          <em>Issues: Read and write</em>.</p>
-        <div class="linha-botoes">
-          <button type="submit" class="botao">Salvar e testar</button>
-          <button type="button" id="apagar-config" class="botao botao-perigo">Apagar deste celular</button>
-        </div>
+        <ol class="passos">
+          <li>
+            <p class="passo-titulo">Crie um token no GitHub</p>
+            <p class="suave pequeno">A página abre com o nome e a validade de 1 ano. Em <em>Repository access</em>,
+              escolha <em>Only select repositories</em> e marque o repositório da fila. Em <em>Permissions</em>,
+              confira <em>Issues: Read and write</em>. Depois, <em>Generate token</em> e copie.</p>
+            <a class="botao botao-secundario botao-link" target="_blank" rel="noopener noreferrer"
+               href="https://github.com/settings/personal-access-tokens/new?name=Garimpo+celular&amp;description=App+Garimpo%3A+so+as+issues+do+repositorio+da+fila&amp;expires_in=366&amp;issues=write">
+              Criar token no GitHub
+              <svg class="ic" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
+            </a>
+          </li>
+          <li>
+            <p class="passo-titulo">Preencha e teste</p>
+            <label for="repo">Repositório da fila</label>
+            <input id="repo" name="repo" type="text" inputmode="url" autocomplete="off" autocapitalize="off"
+                   spellcheck="false" placeholder="usuario/garimpo-fila" required>
+            <label for="token">Token do GitHub</label>
+            <div class="linha-campo">
+              <input id="token" name="token" type="password" autocomplete="off" autocapitalize="off" spellcheck="false"
+                     placeholder="github_pat_..." required>
+              <button type="button" id="colar-token" class="botao botao-secundario">Colar</button>
+            </div>
+            <div class="linha-botoes">
+              <button type="submit" id="salvar-config" class="botao">Salvar e testar</button>
+              <button type="button" id="apagar-config" class="botao botao-perigo">Apagar deste celular</button>
+            </div>
+          </li>
+        </ol>
       </form>
     </section>
 
@@ -63,7 +91,10 @@
         </div>
       </div>
       <p id="link-compartilhado" class="link-quebra"></p>
-      <div id="veredito-anterior" class="item-analise" hidden></div>
+      <div id="andamento-compartilhado"></div>
+      <p id="dica-compartilhado" class="suave pequeno" hidden>O PC baixa e analisa quando você pedir no Claude Code. A
+        resposta aparece aqui na lista.</p>
+      <div id="veredito-anterior" hidden></div>
       <form id="form-nota" hidden novalidate>
         <label for="nota">Nota para o Claude <span class="apagado">(opcional)</span></label>
         <textarea id="nota" name="nota" rows="2" maxlength="500" placeholder="ex.: ver se serve pro Ultron"></textarea>
@@ -71,9 +102,10 @@
       </form>
     </section>
 
-    <form id="form-colar" class="cartao barra-colar" novalidate>
+    <form id="form-colar" class="barra-colar" novalidate>
       <label for="link-colado" class="so-leitor">Link do vídeo</label>
-      <input id="link-colado" name="link" type="url" inputmode="url" autocomplete="off" placeholder="Colar link de um vídeo">
+      <input id="link-colado" name="link" type="text" inputmode="url" autocomplete="off" autocapitalize="off"
+             spellcheck="false" placeholder="Colar link (ou vários)">
       <button type="submit" class="botao">Mandar</button>
     </form>
 
@@ -86,17 +118,30 @@
 
     <section class="painel" aria-labelledby="titulo-fila">
       <div class="cabecalho-secao">
-        <h2 id="titulo-fila">Vídeos</h2>
-        <button type="button" id="atualizar" class="botao-texto">Atualizar</button>
+        <div>
+          <h2 id="titulo-fila">Vídeos</h2>
+          <p id="atualizado" class="atualizado"></p>
+        </div>
+        <button type="button" id="atualizar" class="botao-icone" aria-label="Atualizar a lista">
+          <svg class="ic" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66L20 8.5M20 3.5v5h-5"/></svg>
+        </button>
       </div>
       <div id="filtros" class="filtros" role="group" aria-label="Filtrar por situação"></div>
       <label for="busca" class="so-leitor">Buscar</label>
       <input id="busca" type="search" class="busca" placeholder="Buscar ferramenta, nota ou análise" autocomplete="off" hidden>
-      <ul id="fila" class="fila" aria-live="polite"></ul>
+      <p id="dica-fila" class="dica" hidden>
+        <svg class="ic" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 7v5l3 2M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z"/></svg>
+        <span id="dica-fila-texto"></span>
+      </p>
+      <ul id="fila" class="fila"></ul>
       <div id="carregando" class="esqueletos" hidden aria-hidden="true">
         <div class="esqueleto"></div><div class="esqueleto"></div><div class="esqueleto"></div>
       </div>
-      <p id="fila-vazia" class="vazio" hidden></p>
+      <div id="fila-vazia" class="vazio" hidden>
+        <img src="icone-192.png" width="44" height="44" alt="">
+        <p id="fila-vazia-titulo" class="vazio-titulo"></p>
+        <p id="fila-vazia-texto" class="vazio-texto"></p>
+      </div>
     </section>
   </main>
 
