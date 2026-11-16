@@ -1,7 +1,7 @@
 {
-  "name": "Fila do Claude",
-  "short_name": "Fila Claude",
-  "description": "Manda vídeos do Instagram para o Claude analisar no PC.",
+  "name": "Garimpo",
+  "short_name": "Garimpo",
+  "description": "Manda vídeos do Instagram para o Claude garimpar: só fica o que vale a pena.",
   "id": "./",
   "start_url": "./",
   "scope": "./",

@@ -1,4 +1,4 @@
-# Fila do Claude
+# Garimpo
 
 App web (PWA) para mandar vídeos do Instagram para o Claude analisar no PC, sem copiar link por link.
 
@@ -23,8 +23,8 @@ issue com **Vale a pena** ou **Evite**. A resposta aparece no app.
 2. Menu ⋮ → **Instalar app** (ou "Adicionar à tela inicial" → Instalar).
    - Xiaomi (MIUI/HyperOS): se não aparecer o ícone, libere em Configurações → Apps → Chrome → Outras permissões
      → **Atalhos na tela inicial**.
-3. Abra o app, toque na engrenagem e preencha o repositório (`usuario/fila-videos`) e o token.
-4. No Instagram: Compartilhar → **Fila do Claude**. Ele só aparece na lista se foi *instalado* (passo 2), não
+3. Abra o app, toque na engrenagem e preencha o repositório (`usuario/garimpo-fila`) e o token.
+4. No Instagram: Compartilhar → **Garimpo**. Ele só aparece na lista se foi *instalado* (passo 2), não
    apenas adicionado como favorito.
 
 ## Arquivos

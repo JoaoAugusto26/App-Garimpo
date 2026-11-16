@@ -1,4 +1,4 @@
-// Fila do Claude: recebe links de video pelo "Compartilhar" do Android e guarda cada um como issue num repositorio
+// Garimpo: recebe links de video pelo "Compartilhar" do Android e guarda cada um como issue num repositorio
 // privado do GitHub. O PC le essas issues, baixa e transcreve os videos, e o Claude responde na propria issue.
 'use strict';
 
@@ -389,7 +389,7 @@ async function salvarConfig(evento) {
   const anterior = config();
   const token = campoToken.dataset.salvo && campoToken.value === '••••••••' ? anterior.token : campoToken.value.trim();
   if (!RE_REPO.test(repo)) {
-    avisar('O repositório fica no formato usuario/nome, por exemplo usuario/fila-videos.', 'erro');
+    avisar('O repositório fica no formato usuario/nome, por exemplo usuario/garimpo-fila.', 'erro');
     $('repo').focus();
     return;
   }
@@ -409,7 +409,7 @@ async function salvarConfig(evento) {
       return;
     }
     $('token').dataset.salvo = 'sim';
-    avisar('Tudo certo. Agora é só compartilhar os vídeos com a Fila do Claude.', 'ok');
+    avisar('Tudo certo. Agora é só compartilhar os vídeos com o Garimpo.', 'ok');
     mostrarConfig(false);
     await reenviarPendentes();
     carregarFila();

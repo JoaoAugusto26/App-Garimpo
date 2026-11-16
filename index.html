@@ -8,7 +8,7 @@
   <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#101217" media="(prefers-color-scheme: dark)">
-  <title>Fila do Claude</title>
+  <title>Garimpo</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icone-192.png" type="image/png">
   <link rel="apple-touch-icon" href="icone-192.png">
@@ -17,7 +17,7 @@
 </head>
 <body>
   <header class="topo">
-    <h1>Fila do Claude</h1>
+    <h1>Garimpo</h1>
     <button type="button" id="abrir-config" class="botao-icone" aria-label="Configurações" aria-controls="config" aria-expanded="false">
       <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.4 7.4 0 0 0-1.7-1l-.4-2.6h-3.8l-.4 2.6a7.4 7.4 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.6 7.6 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7.4 7.4 0 0 0 1.7 1l.4 2.6h3.8l.4-2.6a7.4 7.4 0 0 0 1.7-1l2.4 1 2-3.4-2-1.6zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"/></svg>
     </button>
@@ -33,7 +33,7 @@
       <form id="form-config" novalidate>
         <label for="repo">Repositório da fila</label>
         <input id="repo" name="repo" type="text" inputmode="url" autocomplete="off" autocapitalize="off"
-               spellcheck="false" placeholder="usuario/fila-videos" required>
+               spellcheck="false" placeholder="usuario/garimpo-fila" required>
         <label for="token">Token do GitHub</label>
         <input id="token" name="token" type="password" autocomplete="off" autocapitalize="off" spellcheck="false"
                placeholder="github_pat_..." required>
@@ -80,7 +80,7 @@
       </div>
       <ul id="fila" class="fila"></ul>
       <p id="fila-vazia" class="suave" hidden>Nada na fila ainda. No Instagram, toque em Compartilhar e escolha
-        <strong>Fila do Claude</strong>.</p>
+        <strong>Garimpo</strong>.</p>
     </section>
   </main>
 </body>

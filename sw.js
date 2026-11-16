@@ -2,7 +2,7 @@
 // As chamadas ao GitHub nunca passam pelo cache.
 'use strict';
 
-const VERSAO = 'fila-v1';
+const VERSAO = 'garimpo-v1';
 const CASCA = ['./', 'index.html', 'app.js', 'estilo.css', 'manifest.webmanifest', 'icone-192.png', 'icone-512.png'];
 
 self.addEventListener('install', (e) => {
