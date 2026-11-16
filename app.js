@@ -8,6 +8,7 @@
 //
 //   Fonte: https://...        (opcional)
 //   Custo: Gratis (MIT)       (opcional)
+//   Confiança: alta           (opcional: alta, média ou baixa)
 //   Para: Ultron, Remedicy    (opcional)
 //   Instalar: `comando`       (opcional)
 // e talvez "_Já analisado na #N; ..._" no fim.
@@ -22,6 +23,8 @@ const CHAVE_ISSUES = 'garimpo-issues';       // a ultima lista, para abrir na ho
 const CHAVE_VISTOS = 'garimpo-vistos';       // numeros dos vereditos que ele ja viu (os outros ganham "Novo")
 const CHAVE_ATUALIZADO = 'garimpo-atualizado';
 const CHAVE_VISTA = 'garimpo-vista';         // "videos" ou "ferramentas"
+const CHAVE_INSTALAR_DEPOIS = 'garimpo-instalar-depois';  // quando ele tocou em "Agora nao" no cartao de instalar
+const INSTALAR_DEPOIS_MS = 14 * 864e5;      // o cartao volta depois de 14 dias
 const RASTREIO = /^(utm_.*|igsh|igshid|si|fbclid|gclid|mibextid|ref|ref_src|share_id)$/i;
 const RE_REPO = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const RE_URL = /https?:\/\/[^\s<>"'“”]+/i;
@@ -202,13 +205,14 @@ function textoLimpo(corpo) {
 
 // Separa o comentario do veredito no que a tela mostra: motivo, fonte, custo, projetos, comando e observacao.
 function partesDoVeredito(corpo) {
-  const p = { motivo: '', fonte: null, custo: '', para: [], instalar: '', obs: '' };
+  const p = { motivo: '', fonte: null, custo: '', confianca: '', para: [], instalar: '', obs: '' };
   const resto = [];
   for (const linha of String(corpo || '').replace(/\r/g, '').split('\n')) {
-    const m = linha.match(/^\s*(Fonte|Custo|Para|Instalar):\s*(.+?)\s*$/i);
+    const m = linha.match(/^\s*(Fonte|Custo|Confian[cç]a|Para|Instalar):\s*(.+?)\s*$/i);
     if (m) {
-      const campo = m[1].toLowerCase();
+      const campo = semAcento(m[1]);
       if (campo === 'fonte') p.fonte = linkSeguro(m[2]);
+      else if (campo === 'confianca') p.confianca = ['alta', 'media', 'baixa'].find((n) => semAcento(m[2]).startsWith(n)) || '';
       else if (campo === 'custo') p.custo = m[2].slice(0, 60);
       else if (campo === 'para') p.para = m[2].split(',').map((s) => s.trim()).filter(Boolean).slice(0, 5);
       else p.instalar = m[2].replace(/^`+|`+$/g, '').trim();
@@ -508,7 +512,12 @@ function prepararInstalacao() {
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();  // o Chrome mostra o pedido quando ele tocar em "Instalar"
     pedidoInstalar = e;
-    $('instalar-app').hidden = instaladoNoCelular();
+    const adiado = Date.now() - ler(CHAVE_INSTALAR_DEPOIS, 0) < INSTALAR_DEPOIS_MS;
+    $('instalar-app').hidden = instaladoNoCelular() || adiado;
+  });
+  $('instalar-depois').addEventListener('click', () => {
+    gravar(CHAVE_INSTALAR_DEPOIS, Date.now());
+    $('instalar-app').hidden = true;
   });
   window.addEventListener('appinstalled', () => {
     pedidoInstalar = null;
@@ -851,6 +860,7 @@ let filtro = ler(CHAVE_FILTRO, 'tudo');
 let filtroCaixa = 'todas';
 let projeto = null;          // etiqueta de projeto tocada (filtra as duas vistas)
 let busca = '';
+let buscaAberta = false;
 let carregando = false;
 let editandoNota = null;     // numero da issue com a nota aberta para editar
 let ultimaCarga = 0;                          // ultima tentativa (para nao buscar de novo a toda hora)
@@ -972,6 +982,15 @@ function textoComVerTudo(classe, texto, chave, limite = LIMITE_TEXTO) {
   return [p, b];
 }
 
+const NOME_CONFIANCA = { alta: 'Confiança alta', media: 'Confiança média', baixa: 'Confiança baixa' };
+
+function seloConfianca(nivel) {
+  const s = el('span', 'confianca', NOME_CONFIANCA[nivel]);
+  s.dataset.nivel = nivel;
+  s.title = 'Quanto o Claude conseguiu conferir na fonte oficial';
+  return s;
+}
+
 function linhaProjetos(para) {
   const linha = el('div', 'analise-linha');
   linha.append(el('span', 'analise-rotulo', 'Para'));
@@ -1000,9 +1019,10 @@ function preencherAnalise(caixa, corpo) {
   const p = partesDoVeredito(corpo);
   caixa.classList.remove('analise-carregar');
   const filhos = [...textoComVerTudo('analise-texto', p.motivo || 'Sem texto na análise.', `a${caixa.dataset.numero}`)];
-  if (p.custo) {
+  if (p.custo || p.confianca) {
     const linha = el('div', 'analise-linha');
-    linha.append(el('span', 'analise-rotulo', 'Custo'), el('span', 'custo', p.custo));
+    if (p.custo) linha.append(el('span', 'analise-rotulo', 'Custo'), el('span', 'custo', p.custo));
+    if (p.confianca) linha.append(seloConfianca(p.confianca));
     filhos.push(linha);
   }
   if (p.para.length) filhos.push(linhaProjetos(p.para));
@@ -1123,6 +1143,7 @@ function cartaoFerramenta(g) {
   st.dataset.tipo = g.instalada ? 'ok' : 'espera';
   meta.append(st);
   if (g.partes?.custo) meta.append(el('span', 'sep', '·'), el('span', 'custo', g.partes.custo));
+  if (g.partes?.confianca) meta.append(el('span', 'sep', '·'), seloConfianca(g.partes.confianca));
   if (g.issues.length > 1) meta.append(el('span', 'sep', '·'), `${g.issues.length} vídeos`);
   bloco.append(titulo, meta);
   topo.append(marcar, bloco);
@@ -1176,7 +1197,10 @@ function desenharVideos() {
   const chips = FILTROS.filter(([k]) => k === 'tudo' || k === filtro || c[k] > 0)
     .map(([k, nome]) => chipFiltro(k, nome, c[k], k === filtro, k === 'novos' ? 'filtro-novos' : ''));
   $('filtros').replaceChildren(...(projeto ? [chipProjeto()] : []), ...chips);
-  $('busca').hidden = c.tudo < 6 && !busca;
+  const partesResumo = [c.tudo === 1 ? '1 vídeo' : `${c.tudo} vídeos`];
+  if (c.vale) partesResumo.push(`${c.vale} Vale a pena`);
+  if (c.evite) partesResumo.push(`${c.evite} Evite`);
+  $('resumo').textContent = c.tudo ? partesResumo.join(' · ') : '';
 
   const lista = filtrados().sort(maisNovoPrimeiro);
   const nos = [];
@@ -1193,11 +1217,12 @@ function desenharVideos() {
   }
   $('fila').replaceChildren(...nos);
 
-  const esperando = c.fila + c.esperando;
-  $('dica-fila').hidden = !esperando || !['tudo', 'fila', 'esperando'].includes(filtro) || Boolean(busca) || Boolean(projeto);
-  $('dica-fila-texto').textContent = `${esperando === 1 ? '1 vídeo espera' : `${esperando} vídeos esperam`} o PC. `
-    + 'No Claude Code, peça: “analisa os vídeos novos”.';
-  $('resumo-caixa').hidden = true;
+  // Na fila: o PC baixa sozinho. Esperando analise: ja esta baixado, falta pedir no Claude Code.
+  const dicas = [];
+  if (c.fila) dicas.push(`${c.fila} na fila: o PC baixa sozinho.`);
+  if (c.esperando) dicas.push(`${c.esperando === 1 ? '1 pronto' : `${c.esperando} prontos`}: peça “analisa os vídeos novos”.`);
+  $('dica-fila').hidden = !dicas.length || !['tudo', 'fila', 'esperando'].includes(filtro) || Boolean(busca) || Boolean(projeto);
+  $('dica-fila-texto').textContent = dicas.join(' ');
 
   let titulo = 'Nenhum vídeo nesta situação';
   let texto = 'Escolha outro filtro acima.';
@@ -1224,14 +1249,12 @@ function desenharCaixa() {
   n.instalar = n.todas - n.instaladas;
   const chips = FILTROS_CAIXA.map(([k, nome]) => chipFiltro(k, nome, n[k], k === filtroCaixa));
   $('filtros').replaceChildren(...(projeto ? [chipProjeto()] : []), ...chips);
-  $('busca').hidden = grupos.length < 6 && !busca;
   $('dica-fila').hidden = true;
 
   const lista = ferramentasFiltradas(grupos);
   $('fila').replaceChildren(...lista.map(cartaoFerramenta));
-  const resumo = $('resumo-caixa');
-  resumo.hidden = !grupos.length;
-  resumo.textContent = `${n.todas === 1 ? '1 ferramenta vale' : `${n.todas} ferramentas valem`} a pena · `
+  const resumo = $('resumo');
+  resumo.textContent = !grupos.length ? '' : `${n.todas === 1 ? '1 ferramenta vale' : `${n.todas} ferramentas valem`} a pena · `
     + `${n.instaladas} de ${n.todas} instalada${n.todas === 1 ? '' : 's'}`
     + (n.instalar ? '. Toque no círculo quando instalar.' : '');
 
@@ -1265,8 +1288,13 @@ function desenharFila() {
   const rascunho = ta ? { valor: ta.value, foco: document.activeElement === ta, pos: ta.selectionStart } : null;
 
   for (const b of $('vistas').querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.vista === vista));
+  $('titulo-vista').textContent = vista === 'ferramentas' ? 'Caixa de ferramentas' : 'Vídeos';
+  $('atualizar').hidden = !configurado();  // sem GitHub conectado, nao ha o que atualizar
   $('n-ferramentas').textContent = String(caixaDeFerramentas().length || '');
   const c = vista === 'ferramentas' ? (desenharCaixa(), contagens()) : desenharVideos();
+  $('n-novos').textContent = c.novos ? String(c.novos) : '';
+  $('busca').hidden = !(buscaAberta || busca);
+  $('abrir-busca').setAttribute('aria-expanded', String(!$('busca').hidden));
 
   if (rascunho) {
     const novo = document.querySelector('.editar-nota textarea');
@@ -1296,8 +1324,10 @@ function trocarVista(nova) {
   vista = nova;
   gravar(CHAVE_VISTA, vista);
   busca = '';
+  buscaAberta = false;
   $('busca').value = '';
   desenharFila();
+  window.scrollTo({ top: 0 });
   completarTextos();
 }
 
@@ -1563,6 +1593,24 @@ function iniciar() {
   $('busca').addEventListener('input', (e) => {
     busca = e.target.value;
     desenharFila();
+  });
+  // A lupa nao tira o foco do campo ao ser tocada (senao o campo fecha antes do clique e ela abre de novo).
+  $('abrir-busca').addEventListener('mousedown', (e) => e.preventDefault());
+  $('abrir-busca').addEventListener('click', () => {
+    buscaAberta = $('busca').hidden;
+    if (!buscaAberta) {
+      busca = '';
+      $('busca').value = '';
+    }
+    desenharFila();
+    if (buscaAberta) $('busca').focus();
+  });
+  // Campo vazio perdeu o foco: so esconde. Redesenhar aqui recriaria o chip ou botao que ele acabou de tocar.
+  $('busca').addEventListener('blur', () => {
+    if (busca) return;
+    buscaAberta = false;
+    $('busca').hidden = true;
+    $('abrir-busca').setAttribute('aria-expanded', 'false');
   });
   $('token').addEventListener('focus', (e) => {
     if (e.target.dataset.salvo && e.target.value === '••••••••') e.target.select();

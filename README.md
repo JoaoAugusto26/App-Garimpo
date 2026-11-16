@@ -16,8 +16,11 @@ transcreve os vídeos, e o Claude responde na própria issue com **Vale a pena**
   - o andamento (Recebido → Baixado → Analisado);
   - a análise, com a **fonte** oficial, os **projetos** para quem serve e o **comando de instalação** com botão
     Copiar.
-- Vereditos que chegaram desde a última visita ganham **Novo**, um filtro próprio e a contagem no título.
-- **Caixa de ferramentas** (a aba ao lado de Vídeos):
+- Duas abas na barra de baixo, **Vídeos** e **Ferramentas**, cada uma com título grande e resumo. A busca fica atrás
+  da lupa, ao lado dos filtros.
+- Vereditos que chegaram desde a última visita ganham **Novo**, um filtro próprio e a contagem na aba e no título.
+- Cada análise mostra a **confiança** (alta, média ou baixa): quanto o Claude conseguiu conferir na fonte oficial.
+- **Caixa de ferramentas** (a segunda aba):
   - mostra só o que vale a pena, uma vez por ferramenta, com o custo, os projetos e o comando de instalar;
   - o círculo marca a ferramenta como instalada (etiqueta `instalado` no GitHub), e o PC passa a saber o que
     você já tem.
@@ -30,7 +33,9 @@ transcreve os vídeos, e o Claude responde na própria issue com **Vale a pena**
 - Segurando o ícone do app: atalhos **Colar link** e **Caixa de ferramentas**.
 - Abre na hora com a última lista, inclusive sem internet, e atualiza sozinho quando você volta para o app.
 - A configuração tem o botão **Criar token no GitHub**, que abre a página já preenchida. O app também oferece
-  **Instalar** quando o Chrome deixa.
+  **Instalar** quando o Chrome deixa ("Agora não" esconde o aviso por 14 dias).
+- No PC, a tarefa do Windows "Garimpo - baixar videos" baixa e transcreve o que chegou a cada 30 minutos, então o
+  vídeo passa sozinho de "Na fila" para "Esperando análise".
 
 ## Contrato com o PC
 
@@ -39,7 +44,7 @@ transcreve os vídeos, e o Claude responde na própria issue com **Vale a pena**
 | Título | `<rótulo> · <link>` ou só `<link>`. O rótulo é o @autor depois do download e o nome da ferramenta depois da análise. |
 | Corpo | A nota. |
 | Etiquetas | `baixado`, `falhou`, `analisado` + `vale-a-pena` ou `evite`. São a fonte da verdade da situação. O app põe `instalado` quando você marca a ferramenta. |
-| Comentário | O último que começa com `**Vale a pena**` ou `**Evite**` é a análise: o motivo num parágrafo e, depois de uma linha em branco, as linhas opcionais `Fonte: https://...`, `Custo: Grátis (MIT)`, `Para: Ultron, Remedicy` e ``Instalar: `comando` ``. |
+| Comentário | O último que começa com `**Vale a pena**` ou `**Evite**` é a análise: o motivo num parágrafo e, depois de uma linha em branco, as linhas opcionais `Fonte: https://...`, `Custo: Grátis (MIT)`, `Confiança: alta`, `Para: Ultron, Remedicy` e ``Instalar: `comando` ``. |
 
 ## Como funciona
 
