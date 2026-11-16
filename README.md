@@ -17,9 +17,17 @@ transcreve os vídeos, e o Claude responde na própria issue com **Vale a pena**
   - a análise, com a **fonte** oficial, os **projetos** para quem serve e o **comando de instalação** com botão
     Copiar.
 - Vereditos que chegaram desde a última visita ganham **Novo**, um filtro próprio e a contagem no título.
+- **Caixa de ferramentas** (a aba ao lado de Vídeos):
+  - mostra só o que vale a pena, uma vez por ferramenta, com o custo, os projetos e o comando de instalar;
+  - o círculo marca a ferramenta como instalada (etiqueta `instalado` no GitHub), e o PC passa a saber o que
+    você já tem.
+- Tocar numa etiqueta de projeto (Ultron, Remedicy...) mostra só o que serve para ele, nas duas abas.
 - **Filtros** com contagem e **busca** por ferramenta, nota ou análise.
-- **Compartilhar** um veredito, **Tentar de novo** num vídeo que falhou e **Remover** um vídeo da fila (com um
-  segundo toque para confirmar).
+- **Compartilhar** um veredito, **Tentar de novo** num vídeo que falhou, **Editar a nota** de um vídeo na fila e
+  **Remover** (sai na hora, com **Desfazer** na mensagem de baixo).
+- O site não bloqueia mais o "puxar para atualizar" do Chrome. No app instalado ele ainda não foi testado; o
+  botão de atualizar continua lá.
+- Segurando o ícone do app: atalhos **Colar link** e **Caixa de ferramentas**.
 - Abre na hora com a última lista, inclusive sem internet, e atualiza sozinho quando você volta para o app.
 - A configuração tem o botão **Criar token no GitHub**, que abre a página já preenchida. O app também oferece
   **Instalar** quando o Chrome deixa.
@@ -30,8 +38,8 @@ transcreve os vídeos, e o Claude responde na própria issue com **Vale a pena**
 |---|---|
 | Título | `<rótulo> · <link>` ou só `<link>`. O rótulo é o @autor depois do download e o nome da ferramenta depois da análise. |
 | Corpo | A nota. |
-| Etiquetas | `baixado`, `falhou`, `analisado` + `vale-a-pena` ou `evite`. São a fonte da verdade da situação. |
-| Comentário | O último que começa com `**Vale a pena**` ou `**Evite**` é a análise: o motivo num parágrafo e, depois de uma linha em branco, as linhas opcionais `Fonte: https://...`, `Para: Ultron, Remedicy` e ``Instalar: `comando` ``. |
+| Etiquetas | `baixado`, `falhou`, `analisado` + `vale-a-pena` ou `evite`. São a fonte da verdade da situação. O app põe `instalado` quando você marca a ferramenta. |
+| Comentário | O último que começa com `**Vale a pena**` ou `**Evite**` é a análise: o motivo num parágrafo e, depois de uma linha em branco, as linhas opcionais `Fonte: https://...`, `Custo: Grátis (MIT)`, `Para: Ultron, Remedicy` e ``Instalar: `comando` ``. |
 
 ## Como funciona
 
@@ -65,7 +73,7 @@ transcreve os vídeos, e o Claude responde na própria issue com **Vale a pena**
 | `index.html` | A tela. CSP rígida: sem script inline, conexões só com `api.github.com`. |
 | `app.js` | Recebe o compartilhamento, limpa o link, cria a issue e mostra a fila. |
 | `estilo.css` | Visual: tema escuro, preto com dourado. |
-| `manifest.webmanifest` | Nome, ícones e o `share_target` (o que põe o app no Compartilhar). |
+| `manifest.webmanifest` | Nome, ícones, os atalhos do ícone e o `share_target` (o que põe o app no Compartilhar). |
 | `sw.js` | Service worker: abre o app sem internet. Não guarda nada do GitHub. |
 | `icone-*.png` | Ícones (o *maskable* é o recortado pelo Android). |
 

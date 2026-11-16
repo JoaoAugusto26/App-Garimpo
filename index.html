@@ -13,8 +13,8 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icone-192.png" type="image/png">
   <link rel="apple-touch-icon" href="icone-192.png">
-  <link rel="stylesheet" href="estilo.css?v=4">
-  <script src="app.js?v=4" defer></script>
+  <link rel="stylesheet" href="estilo.css?v=5">
+  <script src="app.js?v=5" defer></script>
 </head>
 <body>
   <header class="topo">
@@ -117,22 +117,25 @@
     </section>
 
     <section class="painel" aria-labelledby="titulo-fila">
+      <h2 id="titulo-fila" class="so-leitor">Lista</h2>
       <div class="cabecalho-secao">
-        <div>
-          <h2 id="titulo-fila">Vídeos</h2>
-          <p id="atualizado" class="atualizado"></p>
+        <div id="vistas" class="vistas" role="group" aria-label="O que mostrar">
+          <button type="button" data-vista="videos" aria-pressed="true">Vídeos</button>
+          <button type="button" data-vista="ferramentas" aria-pressed="false">Ferramentas <span id="n-ferramentas" class="vistas-n"></span></button>
         </div>
         <button type="button" id="atualizar" class="botao-icone" aria-label="Atualizar a lista">
           <svg class="ic" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66L20 8.5M20 3.5v5h-5"/></svg>
         </button>
       </div>
-      <div id="filtros" class="filtros" role="group" aria-label="Filtrar por situação"></div>
+      <p id="atualizado" class="atualizado"></p>
+      <div id="filtros" class="filtros" role="group" aria-label="Filtrar"></div>
       <label for="busca" class="so-leitor">Buscar</label>
       <input id="busca" type="search" class="busca" placeholder="Buscar ferramenta, nota ou análise" autocomplete="off" hidden>
       <p id="dica-fila" class="dica" hidden>
         <svg class="ic" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 7v5l3 2M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z"/></svg>
         <span id="dica-fila-texto"></span>
       </p>
+      <p id="resumo-caixa" class="resumo" hidden></p>
       <ul id="fila" class="fila"></ul>
       <div id="carregando" class="esqueletos" hidden aria-hidden="true">
         <div class="esqueleto"></div><div class="esqueleto"></div><div class="esqueleto"></div>

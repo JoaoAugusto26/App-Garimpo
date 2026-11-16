@@ -2,11 +2,12 @@
 // privado do GitHub. O PC le essas issues, baixa e transcreve os videos, e o Claude responde na propria issue.
 //
 // Contrato com o PC (fila_github.py): titulo "<rotulo> · <link>" ou so "<link>"; corpo = nota; etiquetas =
-// status (baixado, falhou, analisado + vale-a-pena/evite); o veredito e o ultimo comentario que comeca com
-// "**Vale a pena**" ou "**Evite**", no formato do compor_veredito():
+// status (baixado, falhou, analisado + vale-a-pena/evite) e "instalado" (posta por este app); o veredito e o
+// ultimo comentario que comeca com "**Vale a pena**" ou "**Evite**", no formato do compor_veredito():
 //   **Vale a pena**: <motivo>
 //
 //   Fonte: https://...        (opcional)
+//   Custo: Gratis (MIT)       (opcional)
 //   Para: Ultron, Remedicy    (opcional)
 //   Instalar: `comando`       (opcional)
 // e talvez "_Já analisado na #N; ..._" no fim.
@@ -15,11 +16,12 @@
 const API = 'https://api.github.com';
 const CHAVE_CONFIG = 'fila-config';          // {repo: "usuario/nome", token: "..."}
 const CHAVE_PENDENTES = 'fila-pendentes';    // links que nao chegaram ao GitHub: [{link, nota, quando}]
-const CHAVE_TEXTOS = 'garimpo-textos';       // cache dos comentarios: {numero: {u: updated_at, t: corpo}}
+const CHAVE_TEXTOS = 'garimpo-textos';       // cache dos comentarios: {numero: {n: quantos comentarios, t: corpo}}
 const CHAVE_FILTRO = 'garimpo-filtro';
 const CHAVE_ISSUES = 'garimpo-issues';       // a ultima lista, para abrir na hora e sem internet
 const CHAVE_VISTOS = 'garimpo-vistos';       // numeros dos vereditos que ele ja viu (os outros ganham "Novo")
 const CHAVE_ATUALIZADO = 'garimpo-atualizado';
+const CHAVE_VISTA = 'garimpo-vista';         // "videos" ou "ferramentas"
 const RASTREIO = /^(utm_.*|igsh|igshid|si|fbclid|gclid|mibextid|ref|ref_src|share_id)$/i;
 const RE_REPO = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const RE_URL = /https?:\/\/[^\s<>"'“”]+/i;
@@ -30,6 +32,7 @@ const FILTROS = [
   ['novos', 'Novos'], ['tudo', 'Tudo'], ['fila', 'Na fila'], ['esperando', 'Esperando'],
   ['vale', 'Vale a pena'], ['evite', 'Evite'], ['falhou', 'Falhou'],
 ];
+const FILTROS_CAIXA = [['todas', 'Todas'], ['instalar', 'Para instalar'], ['instaladas', 'Instaladas']];
 
 const $ = (id) => document.getElementById(id);
 
@@ -38,6 +41,13 @@ function el(tag, classe = '', texto = null) {
   if (classe) e.className = classe;
   if (texto !== null) e.textContent = texto;
   return e;
+}
+
+function botao(classe, texto, dados = {}) {
+  const b = el('button', classe, texto);
+  b.type = 'button';
+  Object.assign(b.dataset, dados);
+  return b;
 }
 
 // ------------------------------------------------------------------ icones (tracos, 24x24)
@@ -55,6 +65,7 @@ const ICONES = {
   compartilhar: 'M12 3v12M7 8l5-5 5 5M5 14v5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-5',
   tentar: 'M20 12a8 8 0 1 1-2.34-5.66L20 8.5M20 3.5v5h-5',
   remover: 'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3',
+  nota: 'M4 20h4L19 9l-4-4L4 16zM14 6l4 4',
 };
 
 function icone(nome, tamanho = 16) {
@@ -189,15 +200,16 @@ function textoLimpo(corpo) {
     .trim();
 }
 
-// Separa o comentario do veredito no que a tela mostra: motivo, fonte, projetos, comando e observacao.
+// Separa o comentario do veredito no que a tela mostra: motivo, fonte, custo, projetos, comando e observacao.
 function partesDoVeredito(corpo) {
-  const p = { motivo: '', fonte: null, para: [], instalar: '', obs: '' };
+  const p = { motivo: '', fonte: null, custo: '', para: [], instalar: '', obs: '' };
   const resto = [];
   for (const linha of String(corpo || '').replace(/\r/g, '').split('\n')) {
-    const m = linha.match(/^\s*(Fonte|Para|Instalar):\s*(.+?)\s*$/i);
+    const m = linha.match(/^\s*(Fonte|Custo|Para|Instalar):\s*(.+?)\s*$/i);
     if (m) {
       const campo = m[1].toLowerCase();
       if (campo === 'fonte') p.fonte = linkSeguro(m[2]);
+      else if (campo === 'custo') p.custo = m[2].slice(0, 60);
       else if (campo === 'para') p.para = m[2].split(',').map((s) => s.trim()).filter(Boolean).slice(0, 5);
       else p.instalar = m[2].replace(/^`+|`+$/g, '').trim();
       continue;
@@ -258,10 +270,11 @@ function grupoDaData(iso) {
 // ------------------------------------------------------------------ GitHub
 
 class ErroGitHub extends Error {
-  constructor(mensagem, { token = false, rede = false } = {}) {
+  constructor(mensagem, { token = false, rede = false, status = 0 } = {}) {
     super(mensagem);
-    this.token = token;  // problema no token ou no repositorio: nao adianta tentar de novo sozinho
-    this.rede = rede;    // sem internet ou GitHub fora: guarda para reenviar
+    this.token = token;    // problema no token ou no repositorio: nao adianta tentar de novo sozinho
+    this.rede = rede;      // sem internet ou GitHub fora: guarda para reenviar
+    this.status = status;
   }
 }
 
@@ -285,21 +298,30 @@ async function gh(caminho, { metodo = 'GET', corpo } = {}) {
     throw new ErroGitHub('Sem conexão com o GitHub.', { rede: true });
   }
   if (r.status === 401) {
-    throw new ErroGitHub('O GitHub recusou o token: ele pode ter expirado ou sido apagado. Gere outro e salve na configuração.', { token: true });
+    throw new ErroGitHub('O GitHub recusou o token: ele pode ter expirado ou sido apagado. Gere outro e salve na configuração.', { token: true, status: 401 });
   }
   if (r.status === 403 || r.status === 404) {
     if (r.headers.get('x-ratelimit-remaining') === '0') {
-      throw new ErroGitHub('Limite de uso do GitHub atingido. Tente de novo daqui a pouco.', { rede: true });
+      throw new ErroGitHub('Limite de uso do GitHub atingido. Tente de novo daqui a pouco.', { rede: true, status: r.status });
     }
-    throw new ErroGitHub(`O GitHub não deixou acessar ${c.repo} (${r.status}). Confira o nome do repositório e se o token tem acesso a ele com "Issues: Read and write".`, { token: true });
+    throw new ErroGitHub(`O GitHub não deixou acessar ${c.repo} (${r.status}). Confira o nome do repositório e se o token tem acesso a ele com "Issues: Read and write".`, { token: true, status: r.status });
   }
-  if (r.status >= 500) throw new ErroGitHub(`O GitHub está com problema (${r.status}).`, { rede: true });
-  if (!r.ok) throw new ErroGitHub(`O GitHub respondeu ${r.status}.`);
+  if (r.status >= 500) throw new ErroGitHub(`O GitHub está com problema (${r.status}).`, { rede: true, status: r.status });
+  if (!r.ok) throw new ErroGitHub(`O GitHub respondeu ${r.status}.`, { status: r.status });
   return r.status === 204 ? null : r.json();
 }
 
 const caminhoRepo = () => `/repos/${config().repo}`;
 const dono = () => config().repo.split('/')[0].toLowerCase();
+
+// So os campos que a tela usa: a lista guardada e o que aparece ao abrir sem internet.
+function guardarIssues(lista) {
+  gravar(CHAVE_ISSUES, lista.map((i) => ({
+    number: i.number, title: i.title, body: i.body, state: i.state, comments: i.comments,
+    created_at: i.created_at, updated_at: i.updated_at, closed_at: i.closed_at,
+    labels: (i.labels || []).map((l) => ({ name: l.name || l })),
+  })));
+}
 
 async function buscarIssues() {
   let todas = [];
@@ -309,12 +331,7 @@ async function buscarIssues() {
     if (lista.length < 100) break;
   }
   const minhas = todas.filter((i) => !i.pull_request && (i.user?.login || '').toLowerCase() === dono());
-  // So os campos que a tela usa: a lista guardada e o que aparece ao abrir sem internet.
-  gravar(CHAVE_ISSUES, minhas.map((i) => ({
-    number: i.number, title: i.title, body: i.body, state: i.state, comments: i.comments,
-    created_at: i.created_at, updated_at: i.updated_at, closed_at: i.closed_at,
-    labels: (i.labels || []).map((l) => ({ name: l.name || l })),
-  })));
+  guardarIssues(minhas);
   ultimaCargaOk = Date.now();
   gravar(CHAVE_ATUALIZADO, ultimaCargaOk);
   semearVistos(minhas);
@@ -338,6 +355,7 @@ function situacao(issue) {
 }
 
 const temVeredito = (i) => ['vale', 'evite'].includes(situacao(i));
+const instalada = (i) => nomesDasEtiquetas(i).has('instalado');
 
 const ROTULO_SITUACAO = {
   vale: ['Vale a pena', 'ok'], evite: ['Evite', 'erro'], falhou: ['Falhou', 'erro'],
@@ -346,6 +364,7 @@ const ROTULO_SITUACAO = {
 
 // A data que conta: quando foi analisado (para os vereditos) ou quando foi mandado.
 const dataDoItem = (i) => (temVeredito(i) && i.closed_at ? i.closed_at : i.created_at) || '';
+const maisNovoPrimeiro = (a, b) => dataDoItem(b).localeCompare(dataDoItem(a));
 
 // ------------------------------------------------------------------ vereditos novos
 
@@ -378,12 +397,13 @@ function voltouDeLonge() {
 
 // ------------------------------------------------------------------ textos (comentarios) com cache
 
+// A chave e o numero de comentarios: mudar uma etiqueta (como "instalado") nao invalida o texto guardado.
 const textos = ler(CHAVE_TEXTOS, {});
 const abertos = new Set();  // analises abertas com "Ver tudo" (sobrevive ao redesenho da lista)
 
 function textoEmCache(issue) {
   const c = textos[issue.number];
-  return c && c.u === issue.updated_at ? c.t : null;
+  return c && c.n === issue.comments ? c.t : null;
 }
 
 async function carregarTexto(issue) {
@@ -392,7 +412,7 @@ async function carregarTexto(issue) {
   let escolhido = [...meus].reverse().find((c) => /^\s*\*\*(Vale a pena|Evite)\*\*/i.test(c.body || ''));
   if (!escolhido) escolhido = meus[meus.length - 1];
   const t = escolhido ? String(escolhido.body || '').trim() : '';
-  textos[issue.number] = { u: issue.updated_at, t };
+  textos[issue.number] = { n: issue.comments, t };
   // guarda so os 150 mais novos
   const chaves = Object.keys(textos).map(Number).sort((a, b) => b - a);
   for (const k of chaves.slice(150)) delete textos[k];
@@ -417,17 +437,44 @@ function avisar(texto, tipo = '') {
   e.hidden = !texto;
 }
 
-let tempoToast = null;
-function toast(texto) {
+// Mensagens de baixo, uma de cada vez. A de "Desfazer" fica mais tempo e nao e atropelada pelas outras.
+const filaToasts = [];
+let toastAtivo = null;
+
+function toast(texto, { acao = null, aoTocar = null, ms = 2600 } = {}) {
+  const t = { texto, acao, aoTocar, ms };
+  if (acao && toastAtivo && !toastAtivo.acao) {
+    filaToasts.unshift(t);  // o "Desfazer" entra na hora, no lugar de uma mensagem simples
+    proximoToast();
+    return;
+  }
+  filaToasts.push(t);
+  if (!toastAtivo) proximoToast();
+}
+
+function proximoToast() {
   const e = $('toast');
-  e.textContent = texto;
+  if (toastAtivo) clearTimeout(toastAtivo.tempo);
+  const t = filaToasts.shift();
+  toastAtivo = t || null;
+  if (!t) {
+    e.classList.remove('visivel');
+    setTimeout(() => { if (!toastAtivo) e.hidden = true; }, 250);
+    return;
+  }
+  e.replaceChildren(el('span', 'toast-texto', t.texto));
+  if (t.acao) {
+    const b = botao('toast-acao', t.acao);
+    b.addEventListener('click', () => {
+      proximoToast();
+      t.aoTocar();
+    }, { once: true });
+    e.append(b);
+  }
   e.hidden = false;
   requestAnimationFrame(() => e.classList.add('visivel'));
-  clearTimeout(tempoToast);
-  tempoToast = setTimeout(() => {
-    e.classList.remove('visivel');
-    setTimeout(() => { e.hidden = true; }, 250);
-  }, 2600);
+  // Uma mensagem simples com outra esperando sai mais cedo; a de "Desfazer" fica o tempo todo.
+  t.tempo = setTimeout(proximoToast, !t.acao && filaToasts.length ? 1400 : t.ms);
 }
 
 const vibrar = () => {
@@ -455,13 +502,13 @@ function mostrarConexao() {
 // ------------------------------------------------------------------ instalar o app
 
 let pedidoInstalar = null;
-const instalado = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const instaladoNoCelular = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 
 function prepararInstalacao() {
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();  // o Chrome mostra o pedido quando ele tocar em "Instalar"
     pedidoInstalar = e;
-    $('instalar-app').hidden = instalado();
+    $('instalar-app').hidden = instaladoNoCelular();
   });
   window.addEventListener('appinstalled', () => {
     pedidoInstalar = null;
@@ -528,8 +575,8 @@ async function salvarConfig(evento) {
     campoToken.focus();
     return;
   }
-  const botao = $('salvar-config');
-  botao.disabled = true;
+  const b = $('salvar-config');
+  b.disabled = true;
   // Grava para o teste usar; se o token ou o repositorio nao servirem, volta a configuracao anterior.
   gravar(CHAVE_CONFIG, { repo, token });
   avisar('Testando…');
@@ -560,7 +607,7 @@ async function salvarConfig(evento) {
       avisar(e.message, 'erro');
     }
   } finally {
-    botao.disabled = false;
+    b.disabled = false;
   }
 }
 
@@ -571,6 +618,7 @@ function apagarConfig() {
   $('token').value = '';
   $('token').dataset.salvo = '';
   $('conectado').hidden = true;
+  $('apagar-config').hidden = true;
   $('config').dataset.conectado = '';
   issues = [];
   vistos = null;
@@ -593,6 +641,7 @@ async function enviarLink(link, nota = '', lista = null) {
   if (aberta) return { issue: aberta, ja: 'na-fila' };
   const issue = await gh(`${caminhoRepo()}/issues`, { metodo: 'POST', corpo: { title: link, body: nota } });
   issues = [issue, ...issues];
+  guardarIssues(issues);
   return { issue, ja: null };
 }
 
@@ -717,18 +766,19 @@ async function receber(link, nota = '') {
 async function salvarNota(evento) {
   evento.preventDefault();
   if (!issueAtual) return;
-  const botao = $('form-nota').querySelector('button');
-  botao.disabled = true;
+  const b = $('form-nota').querySelector('button');
+  b.disabled = true;
   try {
     const nota = $('nota').value.trim().slice(0, 500);
     issueAtual = await gh(`${caminhoRepo()}/issues/${issueAtual.number}`, { metodo: 'PATCH', corpo: { body: nota } });
     issues = issues.map((i) => (i.number === issueAtual.number ? issueAtual : i));
+    guardarIssues(issues);
     desenharFila();
     toast('Nota salva');
   } catch (e) {
     avisar(e.message, 'erro');
   } finally {
-    botao.disabled = false;
+    b.disabled = false;
   }
 }
 
@@ -740,8 +790,8 @@ async function mandarVarios(links) {
     mostrarConfig(true);
     return;
   }
-  const botao = $('form-colar').querySelector('button');
-  botao.disabled = true;
+  const b = $('form-colar').querySelector('button');
+  b.disabled = true;
   toast(`Mandando ${links.length} links…`);
   let novos = 0;
   let ja = 0;
@@ -763,7 +813,7 @@ async function mandarVarios(links) {
     erro = e;
     links.forEach((l) => guardarPendente(l));
   } finally {
-    botao.disabled = false;
+    b.disabled = false;
   }
   desenharFila();
   const partes = [];
@@ -793,17 +843,34 @@ function colar(evento) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// ------------------------------------------------------------------ fila: dados, filtros e busca
+// ------------------------------------------------------------------ estado da lista
 
 let issues = [];
+let vista = ler(CHAVE_VISTA, 'videos');
 let filtro = ler(CHAVE_FILTRO, 'tudo');
+let filtroCaixa = 'todas';
+let projeto = null;          // etiqueta de projeto tocada (filtra as duas vistas)
 let busca = '';
 let carregando = false;
+let editandoNota = null;     // numero da issue com a nota aberta para editar
 let ultimaCarga = 0;                          // ultima tentativa (para nao buscar de novo a toda hora)
 let ultimaCargaOk = ler(CHAVE_ATUALIZADO, 0);  // ultima vez que a lista veio do GitHub
 
 function visiveis() {
   return issues.filter((i) => situacao(i) !== 'removido');
+}
+
+const mesmoProjeto = (a, b) => semAcento(a).trim() === semAcento(b).trim();
+
+function temProjeto(i) {
+  if (!projeto) return true;
+  const corpo = textoEmCache(i);
+  return Boolean(corpo) && partesDoVeredito(corpo).para.some((p) => mesmoProjeto(p, projeto));
+}
+
+function bateBusca(...textosAlvo) {
+  const termo = semAcento(busca.trim());
+  return !termo || semAcento(textosAlvo.join(' ')).includes(termo);
 }
 
 function contagens() {
@@ -816,44 +883,71 @@ function contagens() {
   return c;
 }
 
-function desenharFiltros(c) {
-  if (filtro === 'novos' && !c.novos) filtro = 'tudo';
-  const caixa = $('filtros');
-  caixa.replaceChildren(...FILTROS.filter(([k]) => k === 'tudo' || k === filtro || c[k] > 0).map(([k, nome]) => {
-    const b = el('button', k === 'novos' ? 'filtro filtro-novos' : 'filtro');
-    b.type = 'button';
-    b.dataset.filtro = k;
-    b.setAttribute('aria-pressed', String(k === filtro));
-    b.append(nome, el('span', 'filtro-n', String(c[k])));
-    return b;
-  }));
-  $('busca').hidden = c.tudo < 6 && !busca;
-}
-
 function filtrados() {
-  const termo = semAcento(busca.trim());
   return visiveis().filter((i) => {
     if (filtro === 'novos' && !ehNovo(i)) return false;
     if (!['tudo', 'novos'].includes(filtro) && situacao(i) !== filtro) return false;
-    if (!termo) return true;
-    const alvo = semAcento([i.title, i.body, textoEmCache(i) || ''].join(' '));
-    return alvo.includes(termo);
+    if (!temProjeto(i)) return false;
+    return bateBusca(i.title, i.body, textoEmCache(i) || '');
   });
 }
 
-// ------------------------------------------------------------------ fila: desenho
+// ------------------------------------------------------------------ caixa de ferramentas
+
+// Os "Vale a pena" agrupados pelo nome da ferramenta (dois videos do mesmo Context7 viram um cartao so).
+const chaveDoNome = (i) => semAcento(rotulo(i)).replace(/\s+/g, ' ').trim() || acharLink(i.title) || `#${i.number}`;
+
+function caixaDeFerramentas() {
+  const grupos = new Map();
+  for (const i of visiveis()) {
+    if (situacao(i) !== 'vale') continue;
+    const k = chaveDoNome(i);
+    if (!grupos.has(k)) grupos.set(k, []);
+    grupos.get(k).push(i);
+  }
+  return [...grupos.entries()].map(([chave, lista]) => {
+    lista.sort(maisNovoPrimeiro);
+    const comTexto = lista.find((i) => textoEmCache(i) !== null);
+    return {
+      chave,
+      issues: lista,
+      principal: lista[0],
+      nome: rotulo(lista[0]) || 'Ferramenta',
+      instalada: lista.some(instalada),       // basta um video do grupo marcado
+      novo: lista.some(ehNovo),
+      partes: comTexto ? partesDoVeredito(textoEmCache(comTexto)) : null,
+    };
+  });
+}
+
+function ferramentasFiltradas(grupos) {
+  return grupos.filter((g) => {
+    if (filtroCaixa === 'instalar' && g.instalada) return false;
+    if (filtroCaixa === 'instaladas' && !g.instalada) return false;
+    if (projeto && !(g.partes?.para || []).some((p) => mesmoProjeto(p, projeto))) return false;
+    return bateBusca(g.nome, ...g.issues.map((i) => `${i.body || ''} ${textoEmCache(i) || ''}`));
+  }).sort((a, b) => Number(a.instalada) - Number(b.instalada) || maisNovoPrimeiro(a.principal, b.principal));
+}
+
+// ------------------------------------------------------------------ pedacos do desenho
 
 function botaoAcao(texto, acao, numero, { extra = '', icon = null } = {}) {
-  const b = el('button', `acao ${extra}`.trim());
-  b.type = 'button';
-  b.dataset.acao = acao;
-  b.dataset.numero = numero;
+  const b = botao(`acao ${extra}`.trim(), null, { acao, numero });
   if (icon) b.append(icone(icon, 15));
   b.append(el('span', 'acao-texto', texto));
   return b;
 }
 
-// Recebido -> Baixado -> Analisado, para o que ainda nao tem veredito.
+function linkAcao(texto, href, icon) {
+  const a = el('a', 'acao');
+  a.href = href;
+  a.target = '_blank';
+  a.rel = 'noopener noreferrer';
+  a.append(icone(icon, 14), el('span', 'acao-texto', texto));
+  return a;
+}
+
+// Recebido -> Download -> Analise, para o que ainda nao tem veredito.
 const ETAPAS = { fila: ['feito', 'agora', ''], esperando: ['feito', 'feito', 'agora'], falhou: ['feito', 'erro', ''] };
 
 function andamento(sit) {
@@ -868,29 +962,50 @@ function andamento(sit) {
   return ol;
 }
 
+function textoComVerTudo(classe, texto, chave, limite = LIMITE_TEXTO) {
+  const p = el('p', classe, texto);
+  if (texto.length <= limite) return [p];
+  const aberto = abertos.has(chave);
+  p.classList.toggle('fechado', !aberto);
+  const b = botao('ver-tudo', aberto ? 'Ver menos' : 'Ver tudo', { acao: 'expandir', chave });
+  b.setAttribute('aria-expanded', String(aberto));
+  return [p, b];
+}
+
+function linhaProjetos(para) {
+  const linha = el('div', 'analise-linha');
+  linha.append(el('span', 'analise-rotulo', 'Para'));
+  for (const t of para) {
+    const b = botao('tag', t, { acao: 'projeto', projeto: t });
+    b.setAttribute('aria-pressed', String(Boolean(projeto) && mesmoProjeto(t, projeto)));
+    b.setAttribute('aria-label', `Ver só o que serve para ${t}`);
+    linha.append(b);
+  }
+  return linha;
+}
+
+function linhaComando(comando) {
+  const linha = el('div', 'comando');
+  linha.append(el('code', '', comando));
+  if (podeCopiar()) {
+    const b = botao('comando-copiar', null, { acao: 'copiar', texto: comando });
+    b.setAttribute('aria-label', 'Copiar o comando');
+    b.append(icone('copiar', 15));
+    linha.append(b);
+  }
+  return linha;
+}
+
 function preencherAnalise(caixa, corpo) {
   const p = partesDoVeredito(corpo);
-  const numero = Number(caixa.dataset.numero);
   caixa.classList.remove('analise-carregar');
-  const filhos = [];
-  const texto = el('p', 'analise-texto', p.motivo || 'Sem texto na análise.');
-  filhos.push(texto);
-  if (p.motivo.length > LIMITE_TEXTO) {
-    const aberto = abertos.has(numero);
-    texto.classList.toggle('fechado', !aberto);
-    const b = el('button', 'ver-tudo', aberto ? 'Ver menos' : 'Ver tudo');
-    b.type = 'button';
-    b.dataset.acao = 'expandir';
-    b.dataset.numero = numero;
-    b.setAttribute('aria-expanded', String(aberto));
-    filhos.push(b);
+  const filhos = [...textoComVerTudo('analise-texto', p.motivo || 'Sem texto na análise.', `a${caixa.dataset.numero}`)];
+  if (p.custo) {
+    const linha = el('div', 'analise-linha');
+    linha.append(el('span', 'analise-rotulo', 'Custo'), el('span', 'custo', p.custo));
+    filhos.push(linha);
   }
-  if (p.para.length) {
-    const tags = el('div', 'analise-linha');
-    tags.append(el('span', 'analise-rotulo', 'Para'));
-    for (const t of p.para) tags.append(el('span', 'tag', t));
-    filhos.push(tags);
-  }
+  if (p.para.length) filhos.push(linhaProjetos(p.para));
   if (p.fonte) {
     const linha = el('div', 'analise-linha analise-fonte');
     const a = el('a', 'fonte');
@@ -901,22 +1016,24 @@ function preencherAnalise(caixa, corpo) {
     linha.append(el('span', 'analise-rotulo', 'Fonte'), a);
     filhos.push(linha);
   }
-  if (p.instalar) {
-    const linha = el('div', 'comando');
-    linha.append(el('code', '', p.instalar));
-    if (podeCopiar()) {
-      const b = el('button', 'comando-copiar');
-      b.type = 'button';
-      b.dataset.acao = 'copiar';
-      b.dataset.texto = p.instalar;
-      b.setAttribute('aria-label', 'Copiar o comando');
-      b.append(icone('copiar', 15));
-      linha.append(b);
-    }
-    filhos.push(el('p', 'analise-rotulo analise-rotulo-bloco', 'Como instalar'), linha);
-  }
+  if (p.instalar) filhos.push(el('p', 'analise-rotulo analise-rotulo-bloco', 'Como instalar'), linhaComando(p.instalar));
   if (p.obs) filhos.push(el('p', 'analise-obs', p.obs));
   caixa.replaceChildren(...filhos);
+}
+
+function editorDeNota(issue) {
+  const f = el('div', 'editar-nota');
+  const ta = el('textarea');
+  ta.rows = 2;
+  ta.maxLength = 500;
+  ta.value = issue.body || '';
+  ta.placeholder = 'ex.: ver se serve pro Ultron';
+  ta.setAttribute('aria-label', 'Nota para o Claude');
+  const linha = el('div', 'linha-botoes');
+  linha.append(botao('botao', 'Salvar nota', { acao: 'salvar-nota', numero: issue.number }),
+    botao('botao botao-perigo', 'Cancelar', { acao: 'cancelar-nota', numero: issue.number }));
+  f.append(ta, linha);
+  return f;
 }
 
 function itemDaFila(issue) {
@@ -936,6 +1053,7 @@ function itemDaFila(issue) {
   const bloco = el('div', 'item-bloco');
   const titulo = el('p', 'item-titulo', nome || (link ? `Vídeo do ${plataforma(link)}` : issue.title));
   if (novo) titulo.append(' ', el('span', 'novo', 'Novo'));
+  if (sit === 'vale' && instalada(issue)) titulo.append(' ', el('span', 'selo-instalada', 'Instalada'));
   const meta = el('p', 'item-meta');
   const st = el('span', 'status', textoSit);
   st.dataset.tipo = tipo;
@@ -946,7 +1064,10 @@ function itemDaFila(issue) {
   topo.append(marca, bloco);
   li.append(topo);
 
-  if (issue.body) {
+  const editavel = sit === 'fila' || sit === 'esperando';  // a nota so serve enquanto o PC ainda vai ler
+  if (editavel && editandoNota === issue.number) {
+    li.append(editorDeNota(issue));
+  } else if (issue.body) {
     const nota = el('p', 'item-nota');
     nota.append(el('span', 'item-nota-rotulo', 'Sua nota'), issue.body);
     li.append(nota);
@@ -958,8 +1079,6 @@ function itemDaFila(issue) {
       li.append(blocoDeAnalise(issue, corpo));
     } else {
       const caixa = el('div', 'analise analise-carregar');
-      caixa.dataset.tipo = tipo;
-      caixa.dataset.numero = issue.number;
       caixa.append(botaoAcao(sit === 'falhou' ? 'Ver o motivo' : 'Ver a análise', 'texto', issue.number, { extra: 'acao-link' }));
       li.append(caixa);
     }
@@ -968,32 +1087,98 @@ function itemDaFila(issue) {
   if (ETAPAS[sit]) li.append(andamento(sit));
 
   const acoes = el('div', 'item-acoes');
-  if (link) {
-    const a = el('a', 'acao');
-    a.href = link;
-    a.target = '_blank';
-    a.rel = 'noopener noreferrer';
-    a.append(icone('abrir', 14), el('span', 'acao-texto', 'Abrir vídeo'));
-    acoes.append(a);
-  }
+  if (link) acoes.append(linkAcao('Abrir vídeo', link, 'abrir'));
   if (temVeredito(issue) && (navigator.share || podeCopiar())) {
     acoes.append(botaoAcao('Compartilhar', 'compartilhar', issue.number, { icon: 'compartilhar' }));
   }
   if (sit === 'falhou') acoes.append(botaoAcao('Tentar de novo', 'refazer', issue.number, { icon: 'tentar' }));
+  if (editavel && editandoNota !== issue.number) {
+    acoes.append(botaoAcao(issue.body ? 'Editar nota' : 'Nota', 'nota', issue.number, { icon: 'nota' }));
+  }
   if (sit === 'fila' || sit === 'falhou') {
     const b = botaoAcao('Remover', 'remover', issue.number, { extra: 'acao-perigo acao-so-icone', icon: 'remover' });
     b.setAttribute('aria-label', 'Remover da fila');
-    if (confirmando.has(issue.number)) pedirConfirmacao(b);
     acoes.append(b);
   }
   if (acoes.childElementCount) li.append(acoes);
   return li;
 }
 
-function desenharFila() {
+function cartaoFerramenta(g) {
+  const li = el('li', 'item ferramenta');
+  li.dataset.situacao = 'vale';
+  if (g.instalada) li.dataset.instalada = 'sim';
+  if (g.novo) li.dataset.novo = 'sim';
+
+  const topo = el('div', 'item-topo');
+  const marcar = botao('marcar', null, { acao: 'marcar', chave: g.chave });
+  marcar.setAttribute('aria-pressed', String(g.instalada));
+  marcar.setAttribute('aria-label', g.instalada ? `${g.nome} está instalada. Tocar desmarca.` : `Marcar ${g.nome} como instalada`);
+  marcar.append(icone('vale', 16));
+  const bloco = el('div', 'item-bloco');
+  const titulo = el('p', 'item-titulo', g.nome);
+  if (g.novo) titulo.append(' ', el('span', 'novo', 'Novo'));
+  const meta = el('p', 'item-meta');
+  const st = el('span', 'status', g.instalada ? 'Instalada' : 'Para instalar');
+  st.dataset.tipo = g.instalada ? 'ok' : 'espera';
+  meta.append(st);
+  if (g.partes?.custo) meta.append(el('span', 'sep', '·'), el('span', 'custo', g.partes.custo));
+  if (g.issues.length > 1) meta.append(el('span', 'sep', '·'), `${g.issues.length} vídeos`);
+  bloco.append(titulo, meta);
+  topo.append(marcar, bloco);
+  li.append(topo);
+
+  if (!g.partes) {
+    const caixa = el('div', 'analise analise-carregar');
+    caixa.append(botaoAcao('Ver detalhes', 'texto', g.principal.number, { extra: 'acao-link' }));
+    li.append(caixa);
+  } else {
+    const corpo = el('div', 'ferramenta-corpo');
+    if (g.partes.motivo) corpo.append(...textoComVerTudo('ferramenta-motivo', g.partes.motivo, `f${g.chave}`, 140));
+    if (g.partes.para.length) corpo.append(linhaProjetos(g.partes.para));
+    if (g.partes.instalar && !g.instalada) corpo.append(linhaComando(g.partes.instalar));
+    li.append(corpo);
+  }
+
+  const acoes = el('div', 'item-acoes');
+  if (g.partes?.fonte) acoes.append(linkAcao('Fonte', g.partes.fonte, 'externo'));
+  const link = acharLink(g.principal.title);
+  if (link) acoes.append(linkAcao('Vídeo', link, 'abrir'));
+  if (navigator.share || podeCopiar()) {
+    const b = botaoAcao('Compartilhar', 'compartilhar', g.principal.number, { extra: 'acao-so-icone', icon: 'compartilhar' });
+    b.setAttribute('aria-label', `Compartilhar o veredito de ${g.nome}`);
+    acoes.append(b);
+  }
+  li.append(acoes);
+  return li;
+}
+
+// ------------------------------------------------------------------ desenho
+
+function chipFiltro(chave, nome, n, ativo, extra = '') {
+  const b = botao(`filtro ${extra}`.trim(), null, { filtro: chave });
+  b.setAttribute('aria-pressed', String(ativo));
+  b.append(nome);
+  if (n !== null) b.append(el('span', 'filtro-n', String(n)));
+  return b;
+}
+
+function chipProjeto() {
+  const b = botao('filtro filtro-projeto', null, { filtro: '__projeto' });
+  b.setAttribute('aria-label', `Tirar o filtro do projeto ${projeto}`);
+  b.append(el('span', '', projeto), icone('evite', 13));
+  return b;
+}
+
+function desenharVideos() {
   const c = contagens();
-  desenharFiltros(c);
-  const lista = filtrados().sort((a, b) => dataDoItem(b).localeCompare(dataDoItem(a)));
+  if (filtro === 'novos' && !c.novos) filtro = 'tudo';
+  const chips = FILTROS.filter(([k]) => k === 'tudo' || k === filtro || c[k] > 0)
+    .map(([k, nome]) => chipFiltro(k, nome, c[k], k === filtro, k === 'novos' ? 'filtro-novos' : ''));
+  $('filtros').replaceChildren(...(projeto ? [chipProjeto()] : []), ...chips);
+  $('busca').hidden = c.tudo < 6 && !busca;
+
+  const lista = filtrados().sort(maisNovoPrimeiro);
   const nos = [];
   let grupo = null;
   for (const i of lista) {
@@ -1009,12 +1194,11 @@ function desenharFila() {
   $('fila').replaceChildren(...nos);
 
   const esperando = c.fila + c.esperando;
-  $('dica-fila').hidden = !esperando || !['tudo', 'fila', 'esperando'].includes(filtro) || Boolean(busca);
+  $('dica-fila').hidden = !esperando || !['tudo', 'fila', 'esperando'].includes(filtro) || Boolean(busca) || Boolean(projeto);
   $('dica-fila-texto').textContent = `${esperando === 1 ? '1 vídeo espera' : `${esperando} vídeos esperam`} o PC. `
     + 'No Claude Code, peça: “analisa os vídeos novos”.';
+  $('resumo-caixa').hidden = true;
 
-  const vazio = $('fila-vazia');
-  vazio.hidden = lista.length > 0 || carregando;
   let titulo = 'Nenhum vídeo nesta situação';
   let texto = 'Escolha outro filtro acima.';
   if (!configurado()) {
@@ -1026,10 +1210,74 @@ function desenharFila() {
   } else if (busca) {
     titulo = 'Nada encontrado';
     texto = 'Tente outra palavra: o nome da ferramenta, da nota ou da análise.';
+  } else if (projeto) {
+    titulo = `Nada para ${projeto} aqui`;
+    texto = 'Toque no projeto acima para ver tudo de novo.';
   }
+  mostrarVazio(lista.length, titulo, texto);
+  return c;
+}
+
+function desenharCaixa() {
+  const grupos = caixaDeFerramentas();
+  const n = { todas: grupos.length, instaladas: grupos.filter((g) => g.instalada).length };
+  n.instalar = n.todas - n.instaladas;
+  const chips = FILTROS_CAIXA.map(([k, nome]) => chipFiltro(k, nome, n[k], k === filtroCaixa));
+  $('filtros').replaceChildren(...(projeto ? [chipProjeto()] : []), ...chips);
+  $('busca').hidden = grupos.length < 6 && !busca;
+  $('dica-fila').hidden = true;
+
+  const lista = ferramentasFiltradas(grupos);
+  $('fila').replaceChildren(...lista.map(cartaoFerramenta));
+  const resumo = $('resumo-caixa');
+  resumo.hidden = !grupos.length;
+  resumo.textContent = `${n.todas === 1 ? '1 ferramenta vale' : `${n.todas} ferramentas valem`} a pena · `
+    + `${n.instaladas} de ${n.todas} instalada${n.todas === 1 ? '' : 's'}`
+    + (n.instalar ? '. Toque no círculo quando instalar.' : '');
+
+  let titulo = 'Nada nesta lista';
+  let texto = 'Escolha outro filtro acima.';
+  if (!grupos.length) {
+    titulo = 'Nenhuma ferramenta ainda';
+    texto = 'O que o Claude julgar “Vale a pena” aparece aqui, com o comando para instalar.';
+  } else if (busca) {
+    titulo = 'Nada encontrado';
+    texto = 'Tente outra palavra.';
+  } else if (projeto) {
+    titulo = `Nada para ${projeto} aqui`;
+    texto = 'Toque no projeto acima para ver tudo de novo.';
+  } else if (filtroCaixa === 'instalar') {
+    titulo = 'Tudo instalado';
+    texto = 'Todas as ferramentas que valem a pena já estão marcadas como instaladas.';
+  }
+  mostrarVazio(lista.length, titulo, texto);
+}
+
+function mostrarVazio(quantos, titulo, texto) {
+  $('fila-vazia').hidden = quantos > 0 || carregando;
   $('fila-vazia-titulo').textContent = titulo;
   $('fila-vazia-texto').textContent = texto;
+}
 
+function desenharFila() {
+  // O redesenho recria os cartoes: guarda o que ele estava digitando na nota.
+  const ta = document.querySelector('.editar-nota textarea');
+  const rascunho = ta ? { valor: ta.value, foco: document.activeElement === ta, pos: ta.selectionStart } : null;
+
+  for (const b of $('vistas').querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.vista === vista));
+  $('n-ferramentas').textContent = String(caixaDeFerramentas().length || '');
+  const c = vista === 'ferramentas' ? (desenharCaixa(), contagens()) : desenharVideos();
+
+  if (rascunho) {
+    const novo = document.querySelector('.editar-nota textarea');
+    if (novo) {
+      novo.value = rascunho.valor;
+      if (rascunho.foco) {
+        novo.focus({ preventScroll: true });
+        novo.setSelectionRange(rascunho.pos, rascunho.pos);
+      }
+    }
+  }
   mostrarAtualizado();
   document.title = c.novos ? `(${c.novos}) Garimpo` : 'Garimpo';
   try {
@@ -1043,11 +1291,23 @@ function mostrarAtualizado() {
     ? `Atualizado ${quando(new Date(ultimaCargaOk).toISOString())}` : '';
 }
 
-// Busca os textos dos vereditos que faltam (os mais novos primeiro, poucos por vez).
+function trocarVista(nova) {
+  if (nova === vista) return;
+  vista = nova;
+  gravar(CHAVE_VISTA, vista);
+  busca = '';
+  $('busca').value = '';
+  desenharFila();
+  completarTextos();
+}
+
+// Busca os textos dos vereditos que faltam, poucos por vez. Na Caixa de ferramentas, os "Vale a pena" primeiro.
 async function completarTextos() {
+  if (!configurado()) return;
+  const primeiro = (i) => (vista === 'ferramentas' && situacao(i) === 'vale' ? 0 : 1);
   const faltam = visiveis()
     .filter((i) => ['vale', 'evite', 'falhou'].includes(situacao(i)) && i.comments > 0 && textoEmCache(i) === null)
-    .sort((a, b) => dataDoItem(b).localeCompare(dataDoItem(a)))
+    .sort((a, b) => primeiro(a) - primeiro(b) || maisNovoPrimeiro(a, b))
     .slice(0, MAX_TEXTOS_POR_VEZ);
   if (!faltam.length) return;
   await emParalelo(faltam, 4, async (i) => {
@@ -1084,31 +1344,15 @@ async function carregarFila() {
   }
 }
 
-// ------------------------------------------------------------------ fila: acoes
-
-const confirmando = new Map();
-
-function pedirConfirmacao(b) {
-  b.querySelector('.acao-texto').textContent = 'Toque de novo para remover';
-  b.setAttribute('aria-label', 'Toque de novo para remover');
-  b.classList.add('confirmar');
-}
-
-function voltarRemover(numero) {
-  confirmando.delete(numero);
-  const b = document.querySelector(`button[data-acao="remover"][data-numero="${numero}"]`);
-  if (!b) return;
-  b.querySelector('.acao-texto').textContent = 'Remover';
-  b.setAttribute('aria-label', 'Remover da fila');
-  b.classList.remove('confirmar');
-}
+// ------------------------------------------------------------------ acoes
 
 async function compartilharVeredito(issue) {
   const p = partesDoVeredito(textoEmCache(issue) || '');
   const nome = rotulo(issue) || 'Vídeo';
   const [veredito] = ROTULO_SITUACAO[situacao(issue)];
   const link = acharLink(issue.title);
-  const texto = [`${nome}: ${veredito}`, p.motivo, p.fonte ? `Fonte: ${p.fonte}` : ''].filter(Boolean).join('\n\n');
+  const texto = [`${nome}: ${veredito}`, p.motivo, p.custo ? `Custo: ${p.custo}` : '', p.fonte ? `Fonte: ${p.fonte}` : '']
+    .filter(Boolean).join('\n\n');
   if (navigator.share) {
     try {
       await navigator.share({ title: nome, text: texto, url: link || undefined });
@@ -1120,16 +1364,99 @@ async function compartilharVeredito(issue) {
   copiar(link ? `${texto}\n\n${link}` : texto, 'Veredito copiado');
 }
 
+const comEtiqueta = (i, nome, por) => {
+  const sem = (i.labels || []).filter((l) => (l.name || l) !== nome);
+  return { ...i, labels: por ? [...sem, { name: nome }] : sem };
+};
+
+// "Instalei": poe (ou tira) a etiqueta "instalado" em todos os videos da ferramenta. A tela muda na hora e volta
+// se o GitHub recusar.
+async function marcarInstalada(g, por) {
+  const numeros = new Set(g.issues.map((i) => i.number));
+  const antes = issues;
+  issues = issues.map((i) => (numeros.has(i.number) ? comEtiqueta(i, 'instalado', por) : i));
+  desenharFila();
+  vibrar();
+  try {
+    for (const n of numeros) {
+      if (por) {
+        await gh(`${caminhoRepo()}/issues/${n}/labels`, { metodo: 'POST', corpo: { labels: ['instalado'] } });
+      } else {
+        try {
+          await gh(`${caminhoRepo()}/issues/${n}/labels/instalado`, { metodo: 'DELETE' });
+        } catch (e) {
+          if (e.status !== 404) throw e;  // 404: aquele video ja estava sem a etiqueta
+        }
+      }
+    }
+    guardarIssues(issues);
+    toast(por ? `${g.nome}: instalada` : `${g.nome}: desmarcada`);
+  } catch (e) {
+    issues = antes;
+    desenharFila();
+    avisar(e.rede ? 'Sem conexão: não deu para marcar agora.' : e.message, 'erro');
+  }
+}
+
+// Remover sai na hora e fica uns segundos com "Desfazer".
+async function remover(issue) {
+  const antes = issue;
+  const n = issue.number;
+  issues = issues.map((i) => (i.number === n ? { ...i, state: 'closed' } : i));
+  desenharFila();
+  try {
+    await gh(`${caminhoRepo()}/issues/${n}`, { metodo: 'PATCH', corpo: { state: 'closed', state_reason: 'not_planned' } });
+    guardarIssues(issues);
+  } catch (e) {
+    issues = issues.map((i) => (i.number === n ? antes : i));
+    desenharFila();
+    avisar(e.message, 'erro');
+    return;
+  }
+  toast('Removido da fila', { acao: 'Desfazer', ms: 7000, aoTocar: () => desfazerRemocao(antes) });
+}
+
+async function desfazerRemocao(antes) {
+  try {
+    const volta = await gh(`${caminhoRepo()}/issues/${antes.number}`, {
+      metodo: 'PATCH', corpo: { state: 'open', state_reason: 'reopened' },
+    });
+    issues = issues.map((i) => (i.number === antes.number ? { ...antes, updated_at: volta?.updated_at || antes.updated_at } : i));
+    guardarIssues(issues);
+    desenharFila();
+    toast('Voltou para a fila');
+  } catch (e) {
+    avisar(`Não deu para desfazer: ${e.message}`, 'erro');
+  }
+}
+
+async function salvarNotaDaLista(b, issue) {
+  const ta = b.closest('.item').querySelector('.editar-nota textarea');
+  b.disabled = true;
+  try {
+    const atual = await gh(`${caminhoRepo()}/issues/${issue.number}`, {
+      metodo: 'PATCH', corpo: { body: ta.value.trim().slice(0, 500) },
+    });
+    issues = issues.map((i) => (i.number === issue.number ? { ...i, body: atual.body, updated_at: atual.updated_at } : i));
+    editandoNota = null;
+    guardarIssues(issues);
+    desenharFila();
+    toast('Nota salva');
+  } catch (e) {
+    avisar(e.message, 'erro');
+    b.disabled = false;
+  }
+}
+
 async function agir(evento) {
   const b = evento.target.closest('button[data-acao]');
   if (!b) return;
   const acao = b.dataset.acao;
-  const numero = Number(b.dataset.numero);
 
   if (acao === 'expandir') {
     const aberto = b.getAttribute('aria-expanded') !== 'true';
-    if (aberto) abertos.add(numero);
-    else abertos.delete(numero);
+    if (aberto) abertos.add(b.dataset.chave);
+    else abertos.delete(b.dataset.chave);
     b.previousElementSibling.classList.toggle('fechado', !aberto);
     b.setAttribute('aria-expanded', String(aberto));
     b.textContent = aberto ? 'Ver menos' : 'Ver tudo';
@@ -1139,17 +1466,31 @@ async function agir(evento) {
     copiar(b.dataset.texto, 'Comando copiado');
     return;
   }
+  if (acao === 'projeto') {
+    projeto = projeto && mesmoProjeto(projeto, b.dataset.projeto) ? null : b.dataset.projeto;
+    desenharFila();
+    $('filtros').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    return;
+  }
+  if (acao === 'marcar') {
+    const g = caixaDeFerramentas().find((x) => x.chave === b.dataset.chave);
+    if (g) marcarInstalada(g, !g.instalada);
+    return;
+  }
 
+  const numero = Number(b.dataset.numero);
   const issue = issues.find((i) => i.number === numero) || (issueAtual?.number === numero ? issueAtual : null);
   if (!issue) return;
 
   if (acao === 'texto') {
-    const caixa = b.closest('.analise');
-    caixa.replaceChildren(el('p', 'suave pequeno', 'Carregando…'));
+    b.disabled = true;
+    b.querySelector('.acao-texto').textContent = 'Carregando…';
     try {
-      preencherAnalise(caixa, await carregarTexto(issue));
+      await carregarTexto(issue);
+      desenharFila();
     } catch (e) {
-      caixa.replaceChildren(el('p', 'suave pequeno', e.message));
+      avisar(e.message, 'erro');
+      b.disabled = false;
     }
     return;
   }
@@ -1157,33 +1498,37 @@ async function agir(evento) {
     compartilharVeredito(issue);
     return;
   }
-
-  if (acao === 'remover' && !confirmando.has(numero)) {
-    pedirConfirmacao(b);
-    confirmando.set(numero, setTimeout(() => voltarRemover(numero), 4000));
+  if (acao === 'nota') {
+    editandoNota = numero;
+    desenharFila();
+    document.querySelector('.editar-nota textarea')?.focus();
     return;
   }
-
-  b.disabled = true;
-  try {
-    if (acao === 'remover') {
-      clearTimeout(confirmando.get(numero));
-      confirmando.delete(numero);
-      const fechada = await gh(`${caminhoRepo()}/issues/${numero}`, {
-        metodo: 'PATCH', corpo: { state: 'closed', state_reason: 'not_planned' },
-      });
-      issues = issues.map((i) => (i.number === numero ? { ...fechada, labels: [] } : i));
-      toast('Removido da fila');
-    } else if (acao === 'refazer') {
-      await gh(`${caminhoRepo()}/issues/${numero}/labels/falhou`, { metodo: 'DELETE' });
-      issues = issues.map((i) => (i.number === numero
-        ? { ...i, labels: (i.labels || []).filter((l) => (l.name || l) !== 'falhou') } : i));
-      toast('Volta para a fila');
-    }
+  if (acao === 'cancelar-nota') {
+    editandoNota = null;
     desenharFila();
-  } catch (e) {
-    avisar(e.message, 'erro');
-    b.disabled = false;
+    return;
+  }
+  if (acao === 'salvar-nota') {
+    salvarNotaDaLista(b, issue);
+    return;
+  }
+  if (acao === 'remover') {
+    remover(issue);
+    return;
+  }
+  if (acao === 'refazer') {
+    b.disabled = true;
+    try {
+      await gh(`${caminhoRepo()}/issues/${numero}/labels/falhou`, { metodo: 'DELETE' });
+      issues = issues.map((i) => (i.number === numero ? comEtiqueta(i, 'falhou', false) : i));
+      guardarIssues(issues);
+      toast('Volta para a fila');
+      desenharFila();
+    } catch (e) {
+      avisar(e.message, 'erro');
+      b.disabled = false;
+    }
   }
 }
 
@@ -1200,11 +1545,19 @@ function iniciar() {
   $('reenviar').addEventListener('click', reenviarPendentes);
   $('fila').addEventListener('click', agir);
   $('compartilhado').addEventListener('click', agir);
+  $('vistas').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-vista]');
+    if (b) trocarVista(b.dataset.vista);
+  });
   $('filtros').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-filtro]');
     if (!b) return;
-    filtro = b.dataset.filtro;
-    gravar(CHAVE_FILTRO, filtro);
+    if (b.dataset.filtro === '__projeto') projeto = null;
+    else if (vista === 'ferramentas') filtroCaixa = b.dataset.filtro;
+    else {
+      filtro = b.dataset.filtro;
+      gravar(CHAVE_FILTRO, filtro);
+    }
     desenharFila();
   });
   $('busca').addEventListener('input', (e) => {
@@ -1234,11 +1587,15 @@ function iniciar() {
   prepararInstalacao();
   mostrarConexao();
 
-  // Veio do "Compartilhar"? Le os parametros e limpa a barra de endereco, para recarregar nao mandar de novo.
+  // Veio do "Compartilhar" ou de um atalho do icone? Le os parametros e limpa a barra de endereco, para
+  // recarregar nao mandar de novo.
   const p = new URLSearchParams(location.search);
   const veio = p.has('text') || p.has('url') || p.has('title');
   const link = veio ? acharLink(p.get('url'), p.get('text'), p.get('title')) : null;
-  if (veio) history.replaceState(null, '', location.pathname);
+  const atalho = p.get('abrir');
+  if (veio || atalho) history.replaceState(null, '', location.pathname);
+  if (atalho === 'ferramentas') vista = 'ferramentas';
+  if (!['videos', 'ferramentas'].includes(vista)) vista = 'videos';
 
   if (!FILTROS.some(([k]) => k === filtro) || filtro === 'novos') filtro = 'tudo';
   if (configurado()) {
@@ -1257,6 +1614,7 @@ function iniciar() {
   } else if (configurado()) {
     reenviarPendentes().finally(carregarFila);
   }
+  if (atalho === 'colar' && !veio) $('link-colado').focus();
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
