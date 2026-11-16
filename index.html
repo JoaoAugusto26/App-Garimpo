@@ -8,12 +8,13 @@
   <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#09090b">
   <meta name="color-scheme" content="dark">
+  <meta name="description" content="Manda vídeos do Instagram para o Claude garimpar: só fica o que vale a pena.">
   <title>Garimpo</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icone-192.png" type="image/png">
   <link rel="apple-touch-icon" href="icone-192.png">
-  <link rel="stylesheet" href="estilo.css">
-  <script src="app.js" defer></script>
+  <link rel="stylesheet" href="estilo.css?v=3">
+  <script src="app.js?v=3" defer></script>
 </head>
 <body>
   <header class="topo">
@@ -27,47 +28,54 @@
   </header>
 
   <main>
-    <p id="aviso" class="aviso" role="status" aria-live="polite" hidden></p>
+    <p id="aviso" class="aviso" role="alert" hidden></p>
 
     <section id="config" class="cartao" hidden aria-labelledby="titulo-config">
       <h2 id="titulo-config">Configuração</h2>
-      <p class="suave">Os links vão como issues para um repositório <strong>privado</strong> seu no GitHub. O token fica só
+      <p id="conectado" class="conectado" hidden></p>
+      <p class="suave">Os vídeos vão como issues para um repositório <strong>privado</strong> seu no GitHub. O token fica só
         neste celular.</p>
       <form id="form-config" novalidate>
         <label for="repo">Repositório da fila</label>
         <input id="repo" name="repo" type="text" inputmode="url" autocomplete="off" autocapitalize="off"
                spellcheck="false" placeholder="usuario/garimpo-fila" required>
         <label for="token">Token do GitHub</label>
-        <input id="token" name="token" type="password" autocomplete="off" autocapitalize="off" spellcheck="false"
-               placeholder="github_pat_..." required>
+        <div class="linha-campo">
+          <input id="token" name="token" type="password" autocomplete="off" autocapitalize="off" spellcheck="false"
+                 placeholder="github_pat_..." required>
+          <button type="button" id="colar-token" class="botao botao-secundario">Colar</button>
+        </div>
         <p class="suave pequeno">Token fino (fine-grained), só com este repositório e a permissão
           <em>Issues: Read and write</em>.</p>
         <div class="linha-botoes">
           <button type="submit" class="botao">Salvar e testar</button>
-          <button type="button" id="apagar-config" class="botao botao-secundario">Apagar deste celular</button>
+          <button type="button" id="apagar-config" class="botao botao-perigo">Apagar deste celular</button>
         </div>
       </form>
     </section>
 
     <section id="compartilhado" class="cartao destaque" hidden aria-labelledby="titulo-compartilhado">
-      <h2 id="titulo-compartilhado">Vídeo recebido</h2>
+      <div class="recebido-topo">
+        <span id="selo" class="selo" aria-hidden="true"></span>
+        <div>
+          <h2 id="titulo-compartilhado">Vídeo recebido</h2>
+          <p id="estado-compartilhado" class="estado"></p>
+        </div>
+      </div>
       <p id="link-compartilhado" class="link-quebra"></p>
-      <p id="estado-compartilhado" class="estado"></p>
+      <div id="veredito-anterior" class="item-analise" hidden></div>
       <form id="form-nota" hidden novalidate>
-        <label for="nota">Nota para o Claude (opcional)</label>
+        <label for="nota">Nota para o Claude <span class="apagado">(opcional)</span></label>
         <textarea id="nota" name="nota" rows="2" maxlength="500" placeholder="ex.: ver se serve pro Ultron"></textarea>
         <button type="submit" class="botao">Salvar nota</button>
       </form>
     </section>
 
-    <section class="cartao" aria-labelledby="titulo-colar">
-      <h2 id="titulo-colar">Colar um link</h2>
-      <form id="form-colar" class="linha-campo" novalidate>
-        <label for="link-colado" class="so-leitor">Link do vídeo</label>
-        <input id="link-colado" name="link" type="url" inputmode="url" autocomplete="off" placeholder="https://www.instagram.com/reel/...">
-        <button type="submit" class="botao">Mandar</button>
-      </form>
-    </section>
+    <form id="form-colar" class="cartao barra-colar" novalidate>
+      <label for="link-colado" class="so-leitor">Link do vídeo</label>
+      <input id="link-colado" name="link" type="url" inputmode="url" autocomplete="off" placeholder="Colar link de um vídeo">
+      <button type="submit" class="botao">Mandar</button>
+    </form>
 
     <section id="secao-pendentes" class="cartao" hidden aria-labelledby="titulo-pendentes">
       <h2 id="titulo-pendentes">Ainda não enviados</h2>
@@ -76,15 +84,22 @@
       <button type="button" id="reenviar" class="botao">Tentar de novo</button>
     </section>
 
-    <section class="cartao" aria-labelledby="titulo-fila">
+    <section class="painel" aria-labelledby="titulo-fila">
       <div class="cabecalho-secao">
-        <h2 id="titulo-fila">Fila</h2>
+        <h2 id="titulo-fila">Vídeos</h2>
         <button type="button" id="atualizar" class="botao-texto">Atualizar</button>
       </div>
-      <ul id="fila" class="fila"></ul>
-      <p id="fila-vazia" class="suave" hidden>Nada na fila ainda. No Instagram, toque em Compartilhar e escolha
-        <strong>Garimpo</strong>.</p>
+      <div id="filtros" class="filtros" role="group" aria-label="Filtrar por situação"></div>
+      <label for="busca" class="so-leitor">Buscar</label>
+      <input id="busca" type="search" class="busca" placeholder="Buscar ferramenta, nota ou análise" autocomplete="off" hidden>
+      <ul id="fila" class="fila" aria-live="polite"></ul>
+      <div id="carregando" class="esqueletos" hidden aria-hidden="true">
+        <div class="esqueleto"></div><div class="esqueleto"></div><div class="esqueleto"></div>
+      </div>
+      <p id="fila-vazia" class="vazio" hidden></p>
     </section>
   </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 </body>
 </html>

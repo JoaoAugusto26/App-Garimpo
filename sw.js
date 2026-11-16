@@ -2,8 +2,8 @@
 // As chamadas ao GitHub nunca passam pelo cache.
 'use strict';
 
-const VERSAO = 'garimpo-v1';
-const CASCA = ['./', 'index.html', 'app.js', 'estilo.css', 'manifest.webmanifest', 'icone-192.png', 'icone-512.png'];
+const VERSAO = 'garimpo-v3b';
+const CASCA = ['./', 'index.html', 'app.js?v=3', 'estilo.css?v=3', 'manifest.webmanifest', 'icone-192.png', 'icone-512.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(VERSAO).then((c) => c.addAll(CASCA)).then(() => self.skipWaiting()));
@@ -21,8 +21,12 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
+  // So a pagina e os arquivos dela (script, estilo, icone, manifesto). Chamadas de fetch() do app, como as da
+  // API, tem destination vazio e passam direto, com os cabecalhos intactos.
+  if (req.mode !== 'navigate' && !req.destination) return;
+  // no-cache: confere com o servidor (ETag) em vez de usar o cache de 10 minutos do GitHub Pages.
   e.respondWith(
-    fetch(req)
+    fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' })
       .then((resp) => {
         if (resp.ok && req.mode !== 'navigate') {
           const copia = resp.clone();
