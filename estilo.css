@@ -883,3 +883,16 @@ button:focus-visible, a:focus-visible {
 @media (min-width: 700px) {
   .abas { left: 50%; right: auto; width: 420px; transform: translateX(-50%); bottom: 12px; border: 1px solid var(--borda); border-radius: 18px; padding-bottom: 6px; }
 }
+
+/* Página "Como usar" (ajuda.html): reaproveita o cartão e os passos; só a frase e a lista são novas. */
+.ajuda { padding-bottom: calc(32px + env(safe-area-inset-bottom, 0px)); }
+.frase-ajuda {
+  margin: 8px 0 0; padding: 10px 12px; border-radius: var(--raio-p);
+  background: var(--ouro-fundo); border: 1px solid var(--ouro-borda); color: var(--ouro-forte);
+  font-family: var(--mono); font-size: .92rem; overflow-wrap: anywhere;
+}
+.lista-ajuda { margin: 12px 0 0; display: grid; gap: 4px; }
+.lista-ajuda dt { font-weight: 600; margin-top: 10px; }
+.lista-ajuda dt:first-child { margin-top: 0; }
+.lista-ajuda dd { margin: 0; color: var(--suave); }
+.rodape-ajuda { text-align: center; margin: 8px 16px 0; }

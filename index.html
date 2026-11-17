@@ -13,8 +13,8 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icone-192.png" type="image/png">
   <link rel="apple-touch-icon" href="icone-192.png">
-  <link rel="stylesheet" href="estilo.css?v=6">
-  <script src="app.js?v=6" defer></script>
+  <link rel="stylesheet" href="estilo.css?v=7">
+  <script src="app.js?v=7" defer></script>
 </head>
 <body>
   <header class="topo">
@@ -26,6 +26,9 @@
       </div>
     </div>
     <div class="topo-acoes">
+      <a class="botao-icone" href="ajuda.html" aria-label="Como usar">
+        <svg class="ic" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.5 9.5a2.5 2.5 0 1 1 3.6 2.2c-.7.4-1.1.9-1.1 1.7V14M12 17.5v.01"/></svg>
+      </a>
       <span id="offline" class="pilula-offline" hidden>Sem internet</span>
       <button type="button" id="atualizar" class="botao-icone" aria-label="Atualizar a lista">
         <svg class="ic" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66L20 8.5M20 3.5v5h-5"/></svg>
@@ -56,7 +59,7 @@
         <p id="conectado" class="conectado" hidden></p>
       </div>
       <p class="suave">Cada vídeo vira uma issue num repositório <strong>privado</strong> seu no GitHub. O token fica só
-        neste celular.</p>
+        neste celular. Primeira vez? Veja <a href="ajuda.html">como usar</a>.</p>
       <form id="form-config" novalidate>
         <ol class="passos">
           <li>

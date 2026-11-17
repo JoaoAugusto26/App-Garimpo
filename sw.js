@@ -2,8 +2,8 @@
 // As chamadas ao GitHub nunca passam pelo cache.
 'use strict';
 
-const VERSAO = 'garimpo-v6';
-const CASCA = ['./', 'index.html', 'app.js?v=6', 'estilo.css?v=6', 'manifest.webmanifest', 'icone-192.png', 'icone-512.png'];
+const VERSAO = 'garimpo-v7';
+const CASCA = ['./', 'index.html', 'app.js?v=7', 'estilo.css?v=7', 'ajuda.html', 'manifest.webmanifest', 'icone-192.png', 'icone-512.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(VERSAO).then((c) => c.addAll(CASCA)).then(() => self.skipWaiting()));

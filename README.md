@@ -30,12 +30,17 @@ transcreve os vídeos, e o Claude responde na própria issue com **Vale a pena**
   **Remover** (sai na hora, com **Desfazer** na mensagem de baixo).
 - O site não bloqueia mais o "puxar para atualizar" do Chrome. No app instalado ele ainda não foi testado; o
   botão de atualizar continua lá.
-- Segurando o ícone do app: atalhos **Colar link** e **Caixa de ferramentas**.
+- Segurando o ícone do app: atalhos **Colar link**, **Caixa de ferramentas** e **Como usar**.
+- **Como usar** (o ? no topo, ou `ajuda.html`): o passo a passo do celular ao PC, as situações, as abas e o que fazer
+  quando algo dá errado. Abre também sem internet.
 - Abre na hora com a última lista, inclusive sem internet, e atualiza sozinho quando você volta para o app.
 - A configuração tem o botão **Criar token no GitHub**, que abre a página já preenchida. O app também oferece
   **Instalar** quando o Chrome deixa ("Agora não" esconde o aviso por 14 dias).
 - No PC, a tarefa do Windows "Garimpo - baixar videos" baixa e transcreve o que chegou a cada 30 minutos, então o
-  vídeo passa sozinho de "Na fila" para "Esperando análise".
+  vídeo passa sozinho de "Na fila" para "Esperando análise". Se o PC parar de baixar (desligado, tarefa parada), o
+  app avisa na própria lista, com a hora da última rodada.
+- A dica dos prontos diz há quanto tempo o mais antigo espera ("4 prontos (mandado anteontem): peça 'analisa os
+  vídeos novos'"), para a análise não ficar esquecida.
 
 ## Contrato com o PC
 
@@ -44,6 +49,7 @@ transcreve os vídeos, e o Claude responde na própria issue com **Vale a pena**
 | Título | `<rótulo> · <link>` ou só `<link>`. O rótulo é o @autor depois do download e o nome da ferramenta depois da análise. |
 | Corpo | A nota. |
 | Etiquetas | `baixado`, `falhou`, `analisado` + `vale-a-pena` ou `evite`. São a fonte da verdade da situação. O app põe `instalado` quando você marca a ferramenta. |
+| Descrição da etiqueta `baixado` | `Garimpo PC: ultima rodada 2026-11-17T21:51Z ok`: a hora (UTC) e o resultado (`ok` ou `erro`) da última rodada automática do PC. Se a última rodada deu erro, o app diz "o PC rodou há 10 min, mas deu erro". Com vídeo na fila e o PC parado há mais de 75 min, o app avisa "o PC não baixa há 3 h: ele está ligado?". |
 | Comentário | O último que começa com `**Vale a pena**` ou `**Evite**` é a análise: o motivo num parágrafo e, depois de uma linha em branco, as linhas opcionais `Fonte: https://...`, `Custo: Grátis (MIT)`, `Confiança: alta`, `Para: Ultron, Remedicy` e ``Instalar: `comando` ``. |
 
 ## Como funciona
@@ -76,6 +82,7 @@ transcreve os vídeos, e o Claude responde na própria issue com **Vale a pena**
 | Arquivo | O que faz |
 |---|---|
 | `index.html` | A tela. CSP rígida: sem script inline, conexões só com `api.github.com`. |
+| `ajuda.html` | O "Como usar": página estática, sem script nenhum (`script-src 'none'`). |
 | `app.js` | Recebe o compartilhamento, limpa o link, cria a issue e mostra a fila. |
 | `estilo.css` | Visual: tema escuro, preto com dourado. |
 | `manifest.webmanifest` | Nome, ícones, os atalhos do ícone e o `share_target` (o que põe o app no Compartilhar). |

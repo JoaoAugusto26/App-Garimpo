@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'none'; style-src 'self'; img-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#09090b">
+  <meta name="color-scheme" content="dark">
+  <title>Como usar · Garimpo</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icone-192.png" type="image/png">
+  <link rel="stylesheet" href="estilo.css?v=7">
+</head>
+<body>
+  <header class="topo">
+    <div class="marca">
+      <img src="icone-192.png" width="32" height="32" alt="">
+      <div class="marca-texto">
+        <h1>Como usar</h1>
+        <p class="atualizado">Garimpo + Claude no PC</p>
+      </div>
+    </div>
+    <div class="topo-acoes">
+      <a class="botao botao-secundario botao-link" href="./">Voltar</a>
+    </div>
+  </header>
+
+  <main class="ajuda">
+    <section class="cartao">
+      <h2>O caminho de um vídeo</h2>
+      <ol class="passos">
+        <li>
+          <p class="passo-titulo">Você manda</p>
+          <p class="suave">No Instagram, toque no <strong>aviãozinho</strong> → <strong>Compartilhar em…</strong> (ou
+            <strong>Mais</strong>) → <strong>Garimpo</strong>. Escreva uma nota, se quiser, e toque em
+            <strong>Mandar</strong>. Ou cole o link aqui no app; dá para colar vários de uma vez.</p>
+        </li>
+        <li>
+          <p class="passo-titulo">O PC baixa sozinho</p>
+          <p class="suave">A cada 30 minutos, com o PC ligado, o vídeo é baixado e transcrito. Ele passa de
+            <strong>Na fila</strong> para <strong>Esperando análise</strong>.</p>
+        </li>
+        <li>
+          <p class="passo-titulo">Você pede a análise no PC</p>
+          <p class="suave">Abra o Claude Code (aba Code, sessão Local, qualquer projeto) e diga:</p>
+          <p class="frase-ajuda">analisa os vídeos novos</p>
+        </li>
+        <li>
+          <p class="passo-titulo">O veredito volta para cá</p>
+          <p class="suave"><strong>Vale a pena</strong> ou <strong>Evite</strong>, com o motivo, a fonte oficial, o
+            custo, a confiança e os projetos para quem serve. O que chegou desde a última visita ganha
+            <strong>Novo</strong>.</p>
+        </li>
+      </ol>
+    </section>
+
+    <section class="cartao">
+      <h2>O que cada situação quer dizer</h2>
+      <dl class="lista-ajuda">
+        <dt>Na fila</dt>
+        <dd>Chegou na fila. O PC ainda não baixou: ele baixa a cada 30 minutos, se estiver ligado.</dd>
+        <dt>Esperando análise</dt>
+        <dd>Baixado e transcrito. Falta pedir "analisa os vídeos novos" no PC.</dd>
+        <dt>Vale a pena · Evite</dt>
+        <dd>Analisado. Toque no cartão para ler tudo; o que vale tem o comando de instalar, com o botão Copiar.</dd>
+        <dt>Falhou</dt>
+        <dd>Não deu para baixar: post só de foto, que pede login ou link quebrado. Toque em <strong>Tentar de
+          novo</strong>.</dd>
+      </dl>
+    </section>
+
+    <section class="cartao">
+      <h2>As duas abas</h2>
+      <dl class="lista-ajuda">
+        <dt>Vídeos</dt>
+        <dd>Todos os pedidos, por dia. O funil filtra por situação e a lupa busca por ferramenta, nota ou análise.
+          Tocar num projeto (Ultron, Remedicy…) mostra só o que serve para ele.</dd>
+        <dt>Ferramentas</dt>
+        <dd>A caixa de ferramentas: só o que vale a pena, uma vez por ferramenta. Toque no círculo quando instalar:
+          o PC passa a saber que você já tem e não recomenda de novo.</dd>
+      </dl>
+      <p class="suave pequeno">Em cada cartão: Compartilhar o veredito, Editar a nota (enquanto está na fila) e Remover,
+        com Desfazer logo depois. Segurando o ícone do app: Colar link e Caixa de ferramentas.</p>
+    </section>
+
+    <section class="cartao">
+      <h2>Sem o celular</h2>
+      <p class="suave">No Claude Code, mande os links direto na conversa:</p>
+      <p class="frase-ajuda">veja esses vídeos e me diga o que vale a pena: [links]</p>
+      <p class="suave">Também dá para pedir "como tá a fila?" e "resumo da semana".</p>
+    </section>
+
+    <section class="cartao">
+      <h2>Quando algo dá errado</h2>
+      <dl class="lista-ajuda">
+        <dt>O Garimpo não aparece no Compartilhar</dt>
+        <dd>Ele foi salvo como favorito, não instalado. No Chrome: ⋮ → <strong>Instalar app</strong>. No Xiaomi,
+          libere em Configurações → Apps → Chrome → Outras permissões → <strong>Atalhos na tela inicial</strong>.</dd>
+        <dt>"O GitHub recusou o token"</dt>
+        <dd>O token venceu (dura 1 ano) ou foi apagado. Abra a Configuração, toque em <strong>Criar token no
+          GitHub</strong> e salve o novo. O do PC costuma vencer junto: peça ao Claude "como tá a fila?", que ele
+          avisa.</dd>
+        <dt>O vídeo fica em Na fila por horas</dt>
+        <dd>O PC está desligado ou o download automático parou. Pergunte ao Claude "como tá a fila?".</dd>
+        <dt>Repositório recusado</dt>
+        <dd>O app recusa repositório público de propósito: os links e as notas ficariam visíveis. A fila tem que ser
+          privada.</dd>
+      </dl>
+    </section>
+
+    <p class="rodape-ajuda suave pequeno">O token fica só neste celular e só abre a fila. Se perder o celular, apague o
+      token no GitHub (Settings → Developer settings → Fine-grained tokens).</p>
+  </main>
+</body>
+</html>

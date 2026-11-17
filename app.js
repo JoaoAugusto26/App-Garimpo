@@ -24,6 +24,8 @@ const CHAVE_VISTOS = 'garimpo-vistos';       // numeros dos vereditos que ele ja
 const CHAVE_ATUALIZADO = 'garimpo-atualizado';
 const CHAVE_VISTA = 'garimpo-vista';         // "videos" ou "ferramentas"
 const CHAVE_INSTALAR_DEPOIS = 'garimpo-instalar-depois';  // quando ele tocou em "Agora nao" no cartao de instalar
+const CHAVE_RODADA = 'garimpo-rodada-pc';     // hora (UTC) da ultima rodada automatica do PC, da etiqueta "baixado"
+const PC_PARADO_MIN = 75;                     // a tarefa roda a cada 30 min: mais que isso parado = PC desligado?
 const INSTALAR_DEPOIS_MS = 14 * 864e5;      // o cartao volta depois de 14 dias
 const RASTREIO = /^(utm_.*|igsh|igshid|si|fbclid|gclid|mibextid|ref|ref_src|share_id)$/i;
 const RE_REPO = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
@@ -621,7 +623,7 @@ async function salvarConfig(evento) {
 }
 
 function apagarConfig() {
-  for (const k of [CHAVE_CONFIG, CHAVE_TEXTOS, CHAVE_ISSUES, CHAVE_VISTOS, CHAVE_ATUALIZADO]) gravar(k, null);
+  for (const k of [CHAVE_CONFIG, CHAVE_TEXTOS, CHAVE_ISSUES, CHAVE_VISTOS, CHAVE_ATUALIZADO, CHAVE_RODADA]) gravar(k, null);
   for (const k of Object.keys(textos)) delete textos[k];
   $('repo').value = '';
   $('token').value = '';
@@ -1191,6 +1193,38 @@ function chipProjeto() {
   return b;
 }
 
+// O PC grava a hora de cada rodada automatica na descricao da etiqueta "baixado" (marcar_rodada() no
+// fila_github.py). Sem a etiqueta ou sem internet, fica a ultima hora conhecida.
+async function lerRodadaPC() {
+  try {
+    const l = await gh(`${caminhoRepo()}/labels/baixado`);
+    const m = /ultima rodada (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z)(?: (\w+))?/.exec((l && l.description) || '');
+    if (m) gravar(CHAVE_RODADA, { quando: m[1], resultado: m[2] || 'ok' });
+  } catch {
+    // a lista continua normal; so a dica fica sem a hora do PC
+  }
+}
+
+// Ha quanto tempo o mais antigo dos prontos foi mandado: lembra que tem video parado esperando a analise no PC.
+function esperaDesde() {
+  const datas = visiveis().filter((i) => situacao(i) === 'esperando' && i.created_at).map((i) => i.created_at).sort();
+  if (!datas.length || Date.now() - new Date(datas[0]).getTime() < 3600 * 1000) return '';
+  return ` (mandado ${quando(datas[0]).replace(/\.$/, '')})`;
+}
+
+function textoNaFila(n) {
+  const qtos = n === 1 ? '1 na fila' : `${n} na fila`;
+  const r = ler(CHAVE_RODADA, null);
+  const hora = r && typeof r === 'object' ? r.quando : r;
+  const min = hora ? (Date.now() - new Date(hora).getTime()) / 60000 : NaN;
+  if (Number.isNaN(min)) return `${qtos}: o PC baixa sozinho.`;
+  const q = quando(hora);
+  const desde = (q.startsWith('em ') ? `desde ${q.slice(3)}` : q).replace(/\.$/, '');  // "há 10 min." -> "há 10 min"
+  if (min > PC_PARADO_MIN) return `${qtos}, mas o PC não baixa ${desde}: ele está ligado?`;
+  if (r && r.resultado === 'erro') return `${qtos}: o PC rodou ${desde}, mas deu erro. No PC, pergunte ao Claude “como tá a fila?”.`;
+  return `${qtos}: o PC baixa sozinho (última vez ${desde}).`;
+}
+
 function desenharVideos() {
   const c = contagens();
   if (filtro === 'novos' && !c.novos) filtro = 'tudo';
@@ -1219,8 +1253,8 @@ function desenharVideos() {
 
   // Na fila: o PC baixa sozinho. Esperando analise: ja esta baixado, falta pedir no Claude Code.
   const dicas = [];
-  if (c.fila) dicas.push(`${c.fila} na fila: o PC baixa sozinho.`);
-  if (c.esperando) dicas.push(`${c.esperando === 1 ? '1 pronto' : `${c.esperando} prontos`}: peça “analisa os vídeos novos”.`);
+  if (c.fila) dicas.push(textoNaFila(c.fila));
+  if (c.esperando) dicas.push(`${c.esperando === 1 ? '1 pronto' : `${c.esperando} prontos`}${esperaDesde()}: peça “analisa os vídeos novos”.`);
   $('dica-fila').hidden = !dicas.length || !['tudo', 'fila', 'esperando'].includes(filtro) || Boolean(busca) || Boolean(projeto);
   $('dica-fila-texto').textContent = dicas.join(' ');
 
@@ -1357,7 +1391,7 @@ async function carregarFila() {
   $('carregando').hidden = issues.length > 0;
   $('fila-vazia').hidden = true;
   try {
-    issues = await buscarIssues();
+    [issues] = await Promise.all([buscarIssues(), lerRodadaPC()]);
     carregando = false;
     $('carregando').hidden = true;
     desenharFila();
